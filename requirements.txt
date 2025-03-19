@@ -3,3 +3,12 @@ faster-whisper
 gradio
 librosa
 tabulate
+keyboard
+
+
+# michal: mozna?
+setuptools
+wheel
+nvidia-pyindex
+nvidia-cuda-runtime-cu12
+pycuda

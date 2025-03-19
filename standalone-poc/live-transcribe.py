@@ -8,6 +8,8 @@ import numpy as np
 import pyaudio
 from faster_whisper import WhisperModel
 
+import keyboard
+
 # Yeah I could do this config with argparse, but I won't...
 
 # Audio settings
@@ -24,6 +26,11 @@ WHISPER_THREADS = 4
 # Visualization (expected max number of characters for LENGHT_IN_SEC audio)
 MAX_SENTENCE_CHARACTERS = 80
 
+# import os
+# os.add_dll_directory("c:\\Program Files\\NVIDIA\\CUDNN\\v9.8\\bin\\12.8")
+
+# print("CUDA_VISIBLE_DEVICES: ", os.environ.get("CUDA_VISIBLE_DEVICES"))
+
 # This queue holds all the 1-second audio chunks
 audio_queue = queue.Queue()
 
@@ -32,8 +39,12 @@ audio_queue = queue.Queue()
 length_queue = queue.Queue(maxsize=LENGHT_IN_SEC)
 
 # Whisper model
-whisper = WhisperModel("tiny", device="cpu", compute_type="int8", cpu_threads=WHISPER_THREADS, download_root="./models")
+# whisper = WhisperModel("tiny", device="cpu", compute_type="int8", cpu_threads=WHISPER_THREADS, download_root="./models")
+# whisper = WhisperModel("turbo", device="cuda", compute_type="float16", cpu_threads=WHISPER_THREADS, download_root="./models")
+whisper = WhisperModel("medium", device="cuda", compute_type="float16", cpu_threads=WHISPER_THREADS, download_root="./models")
 
+# Global flag to signal threads to stop
+stop_threads = False
 
 def producer_thread():
     audio = pyaudio.PyAudio()
@@ -51,7 +62,8 @@ def producer_thread():
     print("TRANSCRIPTION")
     print("-" * 80)
 
-    while True:
+    global stop_threads
+    while not stop_threads:
         audio_data = b""
         for _ in range(STEP_IN_SEC):
             chunk = stream.read(RATE)    # Read 1 second of audio data
@@ -62,7 +74,8 @@ def producer_thread():
 
 # Thread which gets items from the queue and prints its length
 def consumer_thread(stats):
-    while True:
+    global stop_threads
+    while not stop_threads:
         if length_queue.qsize() >= LENGHT_IN_SEC:
             with length_queue.mutex:
                 length_queue.queue.clear()
@@ -82,6 +95,7 @@ def consumer_thread(stats):
         audio_data_array: np.ndarray = np.frombuffer(audio_data_to_process, np.int16).astype(np.float32) / 255.0
         # audio_data_array = np.expand_dims(audio_data_array, axis=0)
 
+        print("transcribing %d seconds of audio data" % (audio_data_array.shape[0] / RATE))
         segments, _ = whisper.transcribe(audio_data_array,
                                          language=WHISPER_LANGUAGE,
                                          beam_size=5,
@@ -90,6 +104,8 @@ def consumer_thread(stats):
         segments = [s.text for s in segments]
 
         transcription_end_time = time.time()
+
+        print("Raw segments: ", segments)
 
         transcription = " ".join(segments)
         # remove anything from the text which is between () or [] --> these are non-verbal background noises/music/etc.
@@ -121,19 +137,31 @@ if __name__ == "__main__":
     consumer = threading.Thread(target=consumer_thread, args=(stats,))
     consumer.start()
 
+
+    print("Press q or Esc to exit")
     try:
-        producer.join()
-        consumer.join()
+        # Wait for 'q' to be pressed
+        print("Press 'q' to stop the threads.")
+        keyboard.wait('q')  # This will block until 'q' is pressed
+        print("Exiting...")
+        stop_threads = True
+            
     except KeyboardInterrupt:
         print("Exiting...")
-        # print out the statistics
-        print("Number of processed chunks: ", len(stats["overall"]))
-        print(f"Overall time: avg: {np.mean(stats['overall']):.4f}s, std: {np.std(stats['overall']):.4f}s")
-        print(
-            f"Transcription time: avg: {np.mean(stats['transcription']):.4f}s, std: {np.std(stats['transcription']):.4f}s"
-        )
-        print(
-            f"Postprocessing time: avg: {np.mean(stats['postprocessing']):.4f}s, std: {np.std(stats['postprocessing']):.4f}s"
-        )
-        # We need to add the step_in_sec to the latency as we need to wait for that chunk of audio
-        print(f"The average latency is {np.mean(stats['overall'])+STEP_IN_SEC:.4f}s")
+        stop_threads = True
+
+    # print out the statistics
+    print("Number of processed chunks: ", len(stats["overall"]))
+    print(f"Overall time: avg: {np.mean(stats['overall']):.4f}s, std: {np.std(stats['overall']):.4f}s")
+    print(
+        f"Transcription time: avg: {np.mean(stats['transcription']):.4f}s, std: {np.std(stats['transcription']):.4f}s"
+    )
+    print(
+        f"Postprocessing time: avg: {np.mean(stats['postprocessing']):.4f}s, std: {np.std(stats['postprocessing']):.4f}s"
+    )
+    # We need to add the step_in_sec to the latency as we need to wait for that chunk of audio
+    print(f"The average latency is {np.mean(stats['overall'])+STEP_IN_SEC:.4f}s")
+
+    # Wait for all threads to finish
+    producer.join()
+    consumer.join()
