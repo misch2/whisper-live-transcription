@@ -2,6 +2,7 @@ import queue
 import re
 import threading
 import time
+import os
 from typing import Dict, List
 
 import numpy as np
@@ -9,6 +10,7 @@ import pyaudio
 from faster_whisper import WhisperModel
 
 import keyboard
+from termcolor import colored
 
 # Yeah I could do this config with argparse, but I won't...
 
@@ -22,6 +24,9 @@ CHUNK = RATE
 # Whisper settings
 WHISPER_LANGUAGE = "en"
 WHISPER_THREADS = 4
+WHISPER_MODEL = "turbo"    # "base", "small", "medium", "large", "large-v1", "large-v2", "tiny", "tiny.en", "base.en", "small.en", "medium.en", "large-v1.en", "large-v2.en", "turbo"
+#WHISPER_MODEL = "tiny"  # test only
+WHISPER_COMPUTE_TYPE = "float16"    # "int8", "float16", "float32", "int4", "int4_float16", "int4_float32"
 
 # Visualization (expected max number of characters for LENGHT_IN_SEC audio)
 MAX_SENTENCE_CHARACTERS = 80
@@ -38,10 +43,19 @@ audio_queue = queue.Queue()
 # If the chunk is filled to the max, it will be emptied
 length_queue = queue.Queue(maxsize=LENGHT_IN_SEC)
 
+# Get user home directory
+home_dir = os.path.expanduser("~")
+
+models_dir = os.path.join(home_dir, ".cache", "huggingface", "hub")
+
+print("Initializing Whisper model '%s' with %d threads and compute type '%s'..." % (WHISPER_MODEL, WHISPER_THREADS, WHISPER_COMPUTE_TYPE))
+print("Models will be downloaded to: %s" % models_dir)
 # Whisper model
-# whisper = WhisperModel("tiny", device="cpu", compute_type="int8", cpu_threads=WHISPER_THREADS, download_root="./models")
-# whisper = WhisperModel("turbo", device="cuda", compute_type="float16", cpu_threads=WHISPER_THREADS, download_root="./models")
-whisper = WhisperModel("medium", device="cuda", compute_type="float16", cpu_threads=WHISPER_THREADS, download_root="./models")
+# whisper = WhisperModel("tiny", device="cpu", compute_type="int8", cpu_threads=WHISPER_THREADS, download_root=models_dir)
+# whisper = WhisperModel("turbo", device="cuda", compute_type="float16", cpu_threads=WHISPER_THREADS, download_root=models_dir)
+whisper = WhisperModel(WHISPER_MODEL, device="cuda", compute_type=WHISPER_COMPUTE_TYPE, cpu_threads=WHISPER_THREADS, download_root=models_dir)
+
+print("Whisper model initialized")
 
 # Global flag to signal threads to stop
 stop_threads = False
@@ -59,7 +73,7 @@ def producer_thread():
     print("-" * 80)
     print("Microphone initialized, recording started...")
     print("-" * 80)
-    print("TRANSCRIPTION")
+    print("TRANSCRIPTION using '%s' model" % WHISPER_MODEL)
     print("-" * 80)
 
     global stop_threads
@@ -68,9 +82,13 @@ def producer_thread():
         for _ in range(STEP_IN_SEC):
             chunk = stream.read(RATE)    # Read 1 second of audio data
             audio_data += chunk
+            if stop_threads:
+                break
 
         audio_queue.put(audio_data)    # Put the 5-second audio data into the queue
+        # print('(audio)', end='', flush=True)
 
+    print("\nStopping audio producer thread...")
 
 # Thread which gets items from the queue and prints its length
 def consumer_thread(stats):
@@ -82,6 +100,9 @@ def consumer_thread(stats):
                 print()
 
         audio_data = audio_queue.get()
+        if stop_threads:
+            break
+        
         transcription_start_time = time.time()
         length_queue.put(audio_data)
 
@@ -95,7 +116,8 @@ def consumer_thread(stats):
         audio_data_array: np.ndarray = np.frombuffer(audio_data_to_process, np.int16).astype(np.float32) / 255.0
         # audio_data_array = np.expand_dims(audio_data_array, axis=0)
 
-        print("transcribing %d seconds of audio data" % (audio_data_array.shape[0] / RATE))
+        segment_length_seconds = (audio_data_array.shape[0] / RATE)
+        # print("transcribing %d seconds of audio data" % segment_length_seconds)
         segments, _ = whisper.transcribe(audio_data_array,
                                          language=WHISPER_LANGUAGE,
                                          beam_size=5,
@@ -105,18 +127,23 @@ def consumer_thread(stats):
 
         transcription_end_time = time.time()
 
-        print("Raw segments: ", segments)
+        # print("Raw segments in %d sec segment: %s", segment_length_seconds, segments)
 
         transcription = " ".join(segments)
+
+        # print(colored("Raw segments in %d sec segment: %s", "grey"), segment_length_seconds, transcription, end='\r', flush=True)
+
+
         # remove anything from the text which is between () or [] --> these are non-verbal background noises/music/etc.
-        transcription = re.sub(r"\[.*\]", "", transcription)
-        transcription = re.sub(r"\(.*\)", "", transcription)
+        # transcription = re.sub(r"\[.*\]", "", transcription)
+        # transcription = re.sub(r"\(.*\)", "", transcription)
         # We do this for the more clean visualization (when the next transcription we print would be shorter then the one we printed)
         transcription = transcription.ljust(MAX_SENTENCE_CHARACTERS, " ")
 
         transcription_postprocessing_end_time = time.time()
 
-        print(transcription, end='\r', flush=True)
+        current_time = time.strftime("%H:%M:%S", time.localtime())
+        print(colored(current_time, "green") + " " + transcription, end='\r', flush=True)
 
         audio_queue.task_done()
 
@@ -127,6 +154,7 @@ def consumer_thread(stats):
         stats["transcription"].append(transcription_elapsed_time)
         stats["postprocessing"].append(postprocessing_elapsed_time)
 
+    print("\nStopping consumer thread...")
 
 if __name__ == "__main__":
     stats: Dict[str, List[float]] = {"overall": [], "transcription": [], "postprocessing": []}
@@ -138,16 +166,17 @@ if __name__ == "__main__":
     consumer.start()
 
 
-    print("Press q or Esc to exit")
+    abort_key = 'q'
+    # print("Press q or Esc to exit")
     try:
         # Wait for 'q' to be pressed
-        print("Press 'q' to stop the threads.")
-        keyboard.wait('q')  # This will block until 'q' is pressed
-        print("Exiting...")
+        print("Press '%s' or ^C to stop the threads." % abort_key)
+        keyboard.wait(abort_key)
+        print("Exiting due to abort key (%s) pressed" % abort_key)
         stop_threads = True
             
-    except KeyboardInterrupt:
-        print("Exiting...")
+    except KeyboardInterrupt as e:
+        print("Exiting due to keyboard interrupt: %s" % str(e))
         stop_threads = True
 
     # print out the statistics
@@ -165,3 +194,5 @@ if __name__ == "__main__":
     # Wait for all threads to finish
     producer.join()
     consumer.join()
+
+    print("All threads stopped, exiting...")
