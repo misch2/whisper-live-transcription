@@ -166,14 +166,18 @@ if __name__ == "__main__":
     consumer.start()
 
 
-    abort_key = 'q'
+    abort_key = ''; #'q'
     # print("Press q or Esc to exit")
     try:
         # Wait for 'q' to be pressed
         print("Press '%s' or ^C to stop the threads." % abort_key)
-        keyboard.wait(abort_key)
-        print("Exiting due to abort key (%s) pressed" % abort_key)
-        stop_threads = True
+        if (abort_key == ''):
+            while not stop_threads:
+                time.sleep(0.1)
+        else:
+            keyboard.wait(abort_key)
+            print("Exiting due to abort key (%s) pressed" % abort_key)
+            stop_threads = True
             
     except KeyboardInterrupt as e:
         print("Exiting due to keyboard interrupt: %s" % str(e))
