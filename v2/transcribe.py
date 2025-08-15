@@ -8,51 +8,71 @@ BUFFER_SECONDS = 120
 CHUNK_SECONDS = 30
 CHANNELS = 1
 
+# Whisper LLM parameters
+WHISPER_MODEL = "turbo"
+WHISPER_DEVICE = "cuda"
+WHISPER_COMPUTE_TYPE = "float16"
+WHISPER_THREADS = 4
+WHISPER_LANGUAGE = "en"
+
 
 def main():
+    print("\n====================================")
+    print("  Whisper Live Transcription v2")
+    print("====================================\n")
     buffer = CircularBuffer(BUFFER_SECONDS, SAMPLE_RATE)
-    # Get default audio device info
+    audio_thread = AudioStream(buffer, sample_rate=SAMPLE_RATE, chunk_size=SAMPLE_RATE, channels=CHANNELS)
+    transcriber_thread = Transcriber(
+        buffer,
+        sample_rate=SAMPLE_RATE,
+        chunk_seconds=CHUNK_SECONDS,
+        whisper_model=WHISPER_MODEL,
+        whisper_device=WHISPER_DEVICE,
+        whisper_compute_type=WHISPER_COMPUTE_TYPE,
+        whisper_threads=WHISPER_THREADS,
+        language=WHISPER_LANGUAGE
+    )
+
+    # Display audio device info
     import pyaudio
     pa = pyaudio.PyAudio()
-    default_device_info = pa.get_default_input_device_info()
-    device_index = default_device_info["index"]
-    device_name = default_device_info["name"]
-    device_channels = default_device_info["maxInputChannels"]
-    device_rate = default_device_info["defaultSampleRate"]
+    default_device_index = pa.get_default_input_device_info()["index"]
+    default_device_info = pa.get_device_info_by_index(default_device_index)
+    print("Selected audio device:")
+    print(f"  Index: {default_device_index}")
+    print(f"  Name: {default_device_info['name']}")
+    # print(f"  Channels: {CHANNELS}")
+    # print(f"  Default Sample Rate: {default_device_info['defaultSampleRate']}")
+    # print()
+    # print("Sound sampling parameters:")
+    # print(f"  SAMPLE_RATE: {SAMPLE_RATE}")
+    # print(f"  BUFFER_SECONDS: {BUFFER_SECONDS}")
+    # print(f"  CHUNK_SECONDS (transcription window): {CHUNK_SECONDS}")
+    print()
+    print("Whisper LLM parameters:")
+    print(f"  Model: {WHISPER_MODEL}")
+    print(f"  Device: {WHISPER_DEVICE}")
+    print(f"  Compute type: {WHISPER_COMPUTE_TYPE}")
+    print(f"  Threads: {WHISPER_THREADS}")
+    print(f"  Language: {WHISPER_LANGUAGE}")
+    print()
     pa.terminate()
 
-    print("Selected audio device:")
-    print(f"  Index: {device_index}")
-    print(f"  Name: {device_name}")
-    print(f"  Channels: {device_channels}")
-    print(f"  Default Sample Rate: {device_rate}")
-
-    print("Sound sampling parameters:")
-    print(f"  Sample Rate: {SAMPLE_RATE}")
-    print(f"  Buffer Duration: {BUFFER_SECONDS} seconds")
-    print(f"  Chunk Duration: {CHUNK_SECONDS} seconds")
-    print(f"  Channels: {CHANNELS}")
-
-    transcriber_thread = Transcriber(buffer, sample_rate=SAMPLE_RATE, chunk_seconds=CHUNK_SECONDS)
-    print("Whisper LLM parameters:")
-    print(f"  Model: {transcriber_thread.model.model_name}")
-    print(f"  Device: {transcriber_thread.model.device}")
-    print(f"  Compute Type: {transcriber_thread.model.compute_type}")
-    print(f"  Threads: {transcriber_thread.model.cpu_threads}")
-    print(f"  Language: {transcriber_thread.language}")
-
-    audio_thread = AudioStream(buffer, device_index=device_index, sample_rate=SAMPLE_RATE, chunk_size=SAMPLE_RATE, channels=CHANNELS)
     audio_thread.start()
     transcriber_thread.start()
 
     print("Live transcription started. Press Ctrl+C to stop.")
     try:
         last_output = ""
+        last_metadata = None
         while True:
-            latest = transcriber_thread.get_latest()
+            latest, metadata = transcriber_thread.get_latest()
+            lag = buffer.get_lag()
             if latest and latest != last_output:
-                print(latest)
+                ts = metadata["timestamp"] if metadata else ""
+                print(f"[{ts}] (lag: {lag:.2f}s) {latest}")
                 last_output = latest
+                last_metadata = metadata
             time.sleep(0.5)
     except KeyboardInterrupt:
         print("Stopping...")

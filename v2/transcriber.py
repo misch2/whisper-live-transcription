@@ -17,10 +17,11 @@ class Transcriber(threading.Thread):
         )
         self.language = language
         self._stop_event = threading.Event()
-        self.transcriptions = []
+        self.transcriptions = []  # List of dicts: {text, timestamp, start_time, end_time, duration}
         self.last_read_pos = 0
         self.lag_warning_threshold = 60  # seconds
         self.latest_text = ""
+        self.latest_metadata = None
         self.lock = threading.Lock()
 
     def run(self):
@@ -34,6 +35,8 @@ class Transcriber(threading.Thread):
                 time.sleep(0.5)
                 continue
             audio_float = audio.astype(np.float32) / 255.0
+            end_time = time.time()
+            start_time = end_time - self.chunk_seconds
             segments, _ = self.model.transcribe(
                 audio_float,
                 language=self.language,
@@ -43,9 +46,18 @@ class Transcriber(threading.Thread):
             )
             texts = [s.text for s in segments]
             combined = " ".join(texts)
+            timestamp_str = time.strftime("%H:%M:%S", time.localtime(end_time)) + f".{int((end_time%1)*1000):03d}"
+            metadata = {
+                "text": combined,
+                "timestamp": timestamp_str,
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration": self.chunk_seconds
+            }
             with self.lock:
-                self.transcriptions.append(combined)
+                self.transcriptions.append(metadata)
                 self.latest_text = combined
+                self.latest_metadata = metadata
             time.sleep(1)
 
     def stop(self):
@@ -53,8 +65,8 @@ class Transcriber(threading.Thread):
 
     def get_latest(self):
         with self.lock:
-            return self.latest_text
+            return self.latest_text, self.latest_metadata
 
     def get_all(self):
         with self.lock:
-            return " ".join(self.transcriptions)
+            return list(self.transcriptions)
