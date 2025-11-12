@@ -4,24 +4,52 @@ from audio.audio_stream import AudioStream
 from transcriber import Transcriber
 
 SAMPLE_RATE = 16000
+RECORDING_CHUNK_SIZE = int(SAMPLE_RATE / 4)
 BUFFER_SECONDS = 120
-CHUNK_SECONDS = 30
 CHANNELS = 1
 
 # Whisper LLM parameters
+CHUNK_SECONDS = 30
 WHISPER_MODEL = "turbo"
 WHISPER_DEVICE = "cuda"
 WHISPER_COMPUTE_TYPE = "float16"
 WHISPER_THREADS = 4
 WHISPER_LANGUAGE = "en"
 
+AUDIO_DEVICE_NAME_STARTS_WITH = "Voicemeeter Out B1"
 
 def main():
     print("\n====================================")
     print("  Whisper Live Transcription v2")
     print("====================================\n")
     buffer = CircularBuffer(BUFFER_SECONDS, SAMPLE_RATE)
-    audio_thread = AudioStream(buffer, sample_rate=SAMPLE_RATE, chunk_size=SAMPLE_RATE, channels=CHANNELS)
+
+    import pyaudio
+    pa = pyaudio.PyAudio()
+    voicemeeter_index = None
+    voicemeeter_info = None
+    for i in range(pa.get_device_count()):
+        info = pa.get_device_info_by_index(i)
+        if info["maxInputChannels"] > 0 and info["name"].startswith(AUDIO_DEVICE_NAME_STARTS_WITH):
+            voicemeeter_index = i
+            voicemeeter_info = info
+            break
+    if voicemeeter_index is not None:
+        print("Selected audio device:")
+        print(f"  Index: {voicemeeter_index}")
+        print(f"  Name: {voicemeeter_info['name']}")
+        print()
+    else:
+        print("Voicemeeter Out B1 device not found. Using default input device.")
+        voicemeeter_index = pa.get_default_input_device_info()["index"]
+        voicemeeter_info = pa.get_device_info_by_index(voicemeeter_index)
+        print(f"  Index: {voicemeeter_index}")
+        print(f"  Name: {voicemeeter_info['name']}")
+        print()
+
+    print("Initializing audio stream...")
+    audio_thread = AudioStream(buffer, device_index=voicemeeter_index, sample_rate=SAMPLE_RATE, chunk_size=RECORDING_CHUNK_SIZE, channels=CHANNELS)
+    print("Initializing transcriber...")
     transcriber_thread = Transcriber(
         buffer,
         sample_rate=SAMPLE_RATE,
@@ -33,22 +61,6 @@ def main():
         language=WHISPER_LANGUAGE
     )
 
-    # Display audio device info
-    import pyaudio
-    pa = pyaudio.PyAudio()
-    default_device_index = pa.get_default_input_device_info()["index"]
-    default_device_info = pa.get_device_info_by_index(default_device_index)
-    print("Selected audio device:")
-    print(f"  Index: {default_device_index}")
-    print(f"  Name: {default_device_info['name']}")
-    # print(f"  Channels: {CHANNELS}")
-    # print(f"  Default Sample Rate: {default_device_info['defaultSampleRate']}")
-    # print()
-    # print("Sound sampling parameters:")
-    # print(f"  SAMPLE_RATE: {SAMPLE_RATE}")
-    # print(f"  BUFFER_SECONDS: {BUFFER_SECONDS}")
-    # print(f"  CHUNK_SECONDS (transcription window): {CHUNK_SECONDS}")
-    print()
     print("Whisper LLM parameters:")
     print(f"  Model: {WHISPER_MODEL}")
     print(f"  Device: {WHISPER_DEVICE}")
@@ -63,17 +75,20 @@ def main():
 
     print("Live transcription started. Press Ctrl+C to stop.")
     try:
-        last_output = ""
-        last_metadata = None
+        import matcher
+        history = []
         while True:
-            latest, metadata = transcriber_thread.get_latest()
-            lag = buffer.get_lag()
-            if latest and latest != last_output:
-                ts = metadata["timestamp"] if metadata else ""
-                print(f"[{ts}] (lag: {lag:.2f}s) {latest}")
-                last_output = latest
-                last_metadata = metadata
-            time.sleep(0.5)
+            latest = transcriber_thread.get_latest()
+            result = matcher.match_transcription(latest, history, buffer, SAMPLE_RATE)
+            for line in result["lines"]:
+                print(f"[{result['timestamp']} {result['lag']:.2f}s] {line.ljust(80)}")
+            if latest:
+                if not history or latest["text"] != history[-1]["text"]:
+                    history.append(latest)
+                if result["sentence_end"]:
+                    history = []
+            # time.sleep(0.5)
+            # time.sleep(5)   # FIXME test only
     except KeyboardInterrupt:
         print("Stopping...")
         audio_thread.stop()

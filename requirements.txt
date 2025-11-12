@@ -4,7 +4,8 @@ gradio
 librosa
 tabulate
 keyboard
-
+pydub
+wave
 
 # michal: mozna?
 setuptools

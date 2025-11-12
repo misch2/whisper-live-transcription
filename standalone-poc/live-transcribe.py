@@ -3,6 +3,8 @@ import re
 import threading
 import time
 import os
+import argparse
+from datetime import datetime
 from typing import Dict, List
 
 import numpy as np
@@ -11,8 +13,7 @@ from faster_whisper import WhisperModel
 
 import keyboard
 from termcolor import colored
-
-# Yeah I could do this config with argparse, but I won't...
+from wave_recorder import WaveRecorder
 
 # Audio settings
 STEP_IN_SEC: int = 1  # We'll increase the processable audio data by this
@@ -71,9 +72,17 @@ print("Whisper model initialized")
 # Global flag to signal threads to stop
 stop_threads = False
 
+# Global variable for audio recording
+wave_recorder = WaveRecorder(sample_rate=RATE, channels=NB_CHANNELS)
 
-def producer_thread():
+
+def producer_thread(save_audio_path=None):
     audio = pyaudio.PyAudio()
+    global wave_recorder
+
+    # Initialize WAV saving if path is provided
+    if save_audio_path:
+        wave_recorder.set_output_path(save_audio_path)
 
     # list_pyaudio_devices(audio)
 
@@ -105,9 +114,17 @@ def producer_thread():
             if stop_threads:
                 break
 
-        audio_queue.put(audio_data)  # Put the 5-second audio data into the queue
-        # print('(audio)', end='', flush=True)
+        audio_queue.put(audio_data)  # Put the audio data into the queue for transcription
+        
+        # If saving is enabled, collect audio data in memory
+        if save_audio_path:
+            wave_recorder.add_audio_chunk(audio_data)
 
+    # Close the audio stream
+    stream.stop_stream()
+    stream.close()
+    audio.terminate()
+    
     print("\nStopping audio producer thread...")
 
 
@@ -211,6 +228,12 @@ def get_virtual_audio_mix_device_index(p):
     return index
 
 
+def finalize_audio_saving(output_path):
+    """Save all collected audio data to WAV file"""
+    global wave_recorder
+    
+    wave_recorder.save_to_file()
+
 def list_pyaudio_devices(p):
     hostapi_count = p.get_host_api_count()
     print("Host API count: %d" % hostapi_count)
@@ -247,13 +270,31 @@ def list_pyaudio_devices(p):
 
 
 if __name__ == "__main__":
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Live audio transcription using Whisper')
+    parser.add_argument('--audio-output-path', type=str, help='Folder path to save audio output file with datetime-based name')
+    args = parser.parse_args()
+
+    # Generate datetime-based filename if output path is provided
+    audio_file_path = None
+    if args.audio_output_path:
+        # Ensure the directory exists
+        os.makedirs(args.audio_output_path, exist_ok=True)
+        
+        # Generate datetime-based filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"recording_{timestamp}.wav"
+        audio_file_path = os.path.join(args.audio_output_path, filename)
+        
+        # print(f"Audio will be saved to: {audio_file_path}")
+
     stats: Dict[str, List[float]] = {
         "overall": [],
         "transcription": [],
         "postprocessing": [],
     }
 
-    producer = threading.Thread(target=producer_thread)
+    producer = threading.Thread(target=producer_thread, args=(audio_file_path,))
     producer.start()
 
     consumer = threading.Thread(target=consumer_thread, args=(stats,))
@@ -294,5 +335,10 @@ if __name__ == "__main__":
     # Wait for all threads to finish
     producer.join()
     consumer.join()
+
+    # Finalize audio saving if path was provided
+    if audio_file_path:
+        print("Finalizing audio file...")
+        finalize_audio_saving(audio_file_path)
 
     print("All threads stopped, exiting...")
