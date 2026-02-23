@@ -41,13 +41,10 @@ from typing import Dict, List, Optional
 import numpy as np
 from faster_whisper import WhisperModel
 
-# ── Resolve imports relative to this script ───────────────────────────────────
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(_SCRIPT_DIR, "standalone-poc"))
 
-from wave_recorder import WaveRecorder  # type: ignore[import-untyped]  # noqa: E402
-
-from protocol import (  # noqa: E402
+from wave_recorder import WaveRecorder
+from protocol import (
     DEFAULT_HOST,
     DEFAULT_PORT,
     MSG_AUDIO,

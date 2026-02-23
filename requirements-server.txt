@@ -1,13 +1,10 @@
-pyaudio
 faster-whisper
-gradio
-librosa
-tabulate
-keyboard
-pydub
-wave
+numpy
 
-# michal: mozna?
+# Optional: Windows service support
+pywin32
+
+# CUDA / GPU support
 setuptools
 wheel
 nvidia-pyindex
