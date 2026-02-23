@@ -125,6 +125,10 @@ def producer_thread(save_audio_path=None):
     stream.close()
     audio.terminate()
     
+    # Close WAV file if it was being written to
+    if save_audio_path:
+        wave_recorder.close()
+    
     print("\nStopping audio producer thread...")
 
 
@@ -229,7 +233,7 @@ def get_virtual_audio_mix_device_index(p):
 
 
 def finalize_audio_saving(output_path):
-    """Save all collected audio data to WAV file"""
+    """Close the WAV file (audio has been written continuously)"""
     global wave_recorder
     
     wave_recorder.save_to_file()
@@ -317,6 +321,9 @@ if __name__ == "__main__":
     except KeyboardInterrupt as e:
         print("Exiting due to keyboard interrupt: %s" % str(e))
         stop_threads = True
+        # Ensure WAV file is properly closed
+        if audio_file_path:
+            wave_recorder.close()
 
     # print out the statistics
     print("Number of processed chunks: ", len(stats["overall"]))
