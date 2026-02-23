@@ -1,12 +1,9 @@
 faster-whisper
 numpy
 
-# Optional: Windows service support
-pywin32
-
 # CUDA / GPU support
-setuptools
-wheel
-nvidia-pyindex
-nvidia-cuda-runtime-cu12
-pycuda
+# setuptools
+# wheel
+# nvidia-pyindex
+# nvidia-cuda-runtime-cu12
+# pycuda

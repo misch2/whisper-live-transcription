@@ -10,21 +10,15 @@ The Whisper model is loaded once on startup.  Processing only runs
 while a client is connected — when the client disconnects the server
 idles with near-zero CPU/GPU use until the next connection.
 
-Standalone
-──────────
+Usage
+─────
   python transcription_server.py [--host HOST] [--port PORT] \\
                                  [--audio-output-path FOLDER]
 
-Windows service  (requires pywin32)
-───────────────
-  python transcription_server.py install   # install the service
-  python transcription_server.py remove    # remove it
-  python transcription_server.py start     # start via SCM
-  python transcription_server.py stop      # stop via SCM
-  python transcription_server.py debug     # run interactively for debugging
-
-When installed as a service, settings are read from
-``transcription_server_config.json`` next to this script.
+Windows service (via NSSM)
+──────────────────────────
+  nssm install WhisperTranscription "<venv>\\python.exe" "transcription_server.py --host 0.0.0.0 --port 43007"
+  nssm start WhisperTranscription
 """
 
 import argparse
@@ -32,7 +26,6 @@ import json
 import os
 import queue
 import socket
-import sys
 import threading
 import time
 from datetime import datetime
@@ -40,8 +33,6 @@ from typing import Dict, List, Optional
 
 import numpy as np
 from faster_whisper import WhisperModel
-
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 from wave_recorder import WaveRecorder
 from protocol import (
@@ -63,10 +54,6 @@ WHISPER_COMPUTE_TYPE = "float16"
 # ── Transcription window ─────────────────────────────────────────────────────
 WINDOW_LENGTH_SEC = 6
 MAX_SENTENCE_CHARACTERS = 80
-
-# ── Service helpers ───────────────────────────────────────────────────────────
-SERVICE_CONFIG_FILE = os.path.join(_SCRIPT_DIR, "transcription_server_config.json")
-_SERVICE_COMMANDS = {"install", "update", "remove", "start", "stop", "restart", "debug"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -92,17 +79,32 @@ class TranscriptionServer:
 
     # ── Model loading ─────────────────────────────────────────────────────
     def _load_model(self):
+        try:
+            import ctranslate2
+            cuda_devices = ctranslate2.get_cuda_device_count()
+            if cuda_devices > 0:
+                device = "cuda"
+                print(f"GPU detected ({cuda_devices} device(s)), using CUDA.")
+            else:
+                device = "cpu"
+                print("No CUDA GPU detected, falling back to CPU.")
+        except Exception:
+            device = "cpu"
+            print("Could not query CUDA devices, falling back to CPU.")
+
+        compute_type = WHISPER_COMPUTE_TYPE if device == "cuda" else "int8"
+
         home_dir = os.path.expanduser("~")
         models_dir = os.path.join(home_dir, ".cache", "huggingface", "hub")
         print(
             f"Loading Whisper model '{WHISPER_MODEL}' "
-            f"(threads={WHISPER_THREADS}, compute={WHISPER_COMPUTE_TYPE}) …"
+            f"(device={device}, compute={compute_type}, threads={WHISPER_THREADS})..."
         )
         print(f"Model cache: {models_dir}")
         self.whisper = WhisperModel(
             WHISPER_MODEL,
-            device="cuda",
-            compute_type=WHISPER_COMPUTE_TYPE,
+            device=device,
+            compute_type=compute_type,
             cpu_threads=WHISPER_THREADS,
             download_root=models_dir,
         )
@@ -121,7 +123,7 @@ class TranscriptionServer:
         self._server_socket.listen(1)
 
         print(f"Listening on {self.host}:{self.port}")
-        print("Waiting for client …\n")
+        print("Waiting for client...\n")
 
         while self.running:
             try:
@@ -132,9 +134,9 @@ class TranscriptionServer:
                 break
 
             self._client_socket = client_sock
-            print(f"\n{'═' * 60}")
+            print(f"\n{'=' * 60}")
             print(f"  Client connected: {addr}")
-            print(f"{'═' * 60}")
+            print(f"{'=' * 60}")
 
             try:
                 self._handle_client(client_sock)
@@ -144,7 +146,7 @@ class TranscriptionServer:
                 self._client_socket = None
 
             print(f"\nClient {addr} disconnected.")
-            print("Waiting for client …\n")
+            print("Waiting for client...\n")
 
         if self._server_socket:
             self._server_socket.close()
@@ -297,76 +299,6 @@ class TranscriptionServer:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Windows service  (optional — requires pywin32)
-# ══════════════════════════════════════════════════════════════════════════════
-try:
-    import win32serviceutil
-    import win32service
-    import win32event
-    import servicemanager
-
-    class TranscriptionWindowsService(win32serviceutil.ServiceFramework):
-        _svc_name_ = "WhisperTranscription"
-        _svc_display_name_ = "Whisper Live Transcription Server"
-        _svc_description_ = (
-            "Accepts audio streams over TCP, transcribes with Whisper, "
-            "and optionally saves WAV recordings."
-        )
-
-        def __init__(self, args):
-            super().__init__(args)
-            self.stop_event = win32event.CreateEvent(None, 0, 0, None)
-            self.server: Optional[TranscriptionServer] = None
-
-        def SvcStop(self):
-            self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-            win32event.SetEvent(self.stop_event)
-            if self.server:
-                self.server.stop()
-
-        def SvcDoRun(self):
-            servicemanager.LogMsg(
-                servicemanager.EVENTLOG_INFORMATION_TYPE,
-                servicemanager.PYS_SERVICE_STARTED,
-                (self._svc_name_, ""),
-            )
-            cfg = _load_service_config()
-            self.server = TranscriptionServer(
-                host=cfg.get("host", DEFAULT_HOST),
-                port=cfg.get("port", DEFAULT_PORT),
-                audio_output_path=cfg.get("audio_output_path"),
-            )
-            self.server.start()
-
-    _HAS_SERVICE = True
-
-except ImportError:
-    _HAS_SERVICE = False
-
-
-def _load_service_config() -> dict:
-    """Read the JSON config file (used by the Windows service)."""
-    if os.path.exists(SERVICE_CONFIG_FILE):
-        with open(SERVICE_CONFIG_FILE, encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-
-def _save_default_service_config():
-    """Write a starter config file if none exists."""
-    if not os.path.exists(SERVICE_CONFIG_FILE):
-        cfg = {
-            "host": DEFAULT_HOST,
-            "port": DEFAULT_PORT,
-            "audio_output_path": None,
-        }
-        with open(SERVICE_CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2)
-        print(f"Default config written to {SERVICE_CONFIG_FILE}")
-        print("Edit it before starting the service.\n")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 #  CLI entry-point
 # ══════════════════════════════════════════════════════════════════════════════
 def main():
@@ -393,14 +325,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # If the first argument is a Windows-service verb, delegate to pywin32.
-    if len(sys.argv) > 1 and sys.argv[1].lower() in _SERVICE_COMMANDS:
-        if not _HAS_SERVICE:
-            print("pywin32 is required for Windows service support.")
-            print("Install it with:  pip install pywin32")
-            sys.exit(1)
-        if sys.argv[1].lower() == "install":
-            _save_default_service_config()
-        win32serviceutil.HandleCommandLine(TranscriptionWindowsService)
-    else:
-        main()
+    main()

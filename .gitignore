@@ -7,3 +7,5 @@ test-*
 .venv/
 *.pem
 visits.csv
+/service_error.log
+/service.log
