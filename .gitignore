@@ -14,3 +14,5 @@ visits.csv
 /TranscriptionClient/obj/Debug/net9.0-windows
 /TranscriptionClient/obj/Release/net9.0-windows
 /TranscriptionClient/obj
+/TranscriptionClient/.vs
+/TranscriptionClient/bin/Release/net9.0-windows

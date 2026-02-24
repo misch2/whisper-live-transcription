@@ -2,14 +2,13 @@
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using NAudio.Wave;
 
 namespace TranscriptionClient;
 
 public partial class MainWindow : Window
 {
     private TranscriptionService? _service;
-    private List<AudioDeviceInfo> _allDevices = new();
+    private AppSettings _settings = LoadSettingsOrDefault();
 
     // Colours (match XAML palette)
     private static readonly SolidColorBrush GreenBrush  = new(Color.FromRgb(0x50, 0xFA, 0x7B));
@@ -21,81 +20,100 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Loaded += OnLoaded;
+        Loaded  += OnLoaded;
+        Closing += OnClosing;
     }
 
-    // ── Initialisation ────────────────────────────────────────────────────────
+    // ── Window geometry persistence ───────────────────────────────────────────
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        RefreshDeviceList(filter: string.Empty);
-
-        // Pre-select the first device whose name starts with the default prefix
-        const string defaultPrefix = "Voicemeeter Out B1";
-        var preferred = _allDevices.FirstOrDefault(d =>
-            d.Name.StartsWith(defaultPrefix, StringComparison.OrdinalIgnoreCase));
-        CmbDevice.SelectedItem = preferred ?? CmbDevice.Items[0];
-
-        TxtDeviceFilter.Text = defaultPrefix;
-    }
-
-    // ── Device list ───────────────────────────────────────────────────────────
-
-    private void RefreshDeviceList(string filter)
-    {
-        _allDevices.Clear();
-        int count = WaveInEvent.DeviceCount;
-        for (int i = 0; i < count; i++)
+        if (!double.IsNaN(_settings.WindowLeft) && !double.IsNaN(_settings.WindowTop))
         {
-            var caps = WaveInEvent.GetCapabilities(i);
-            _allDevices.Add(new AudioDeviceInfo { DeviceNumber = i, Name = caps.ProductName });
+            Left = _settings.WindowLeft;
+            Top  = _settings.WindowTop;
         }
 
-        var filtered = string.IsNullOrWhiteSpace(filter)
-            ? _allDevices
-            : _allDevices.Where(d => d.Name.StartsWith(filter, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (!double.IsNaN(_settings.WindowWidth) && _settings.WindowWidth >= MinWidth)
+            Width = _settings.WindowWidth;
 
-        // Always add a "System default" entry at index 0
-        var items = new List<AudioDeviceInfo>
+        if (!double.IsNaN(_settings.WindowHeight) && _settings.WindowHeight >= MinHeight)
+            Height = _settings.WindowHeight;
+
+        if (Enum.TryParse<WindowState>(_settings.WindowState, out var state) &&
+            state != System.Windows.WindowState.Minimized)
         {
-            new() { DeviceNumber = -1, Name = "(System default)" }
-        };
-        items.AddRange(filtered.Count > 0 ? filtered : _allDevices);
-
-        var previousName = (CmbDevice.SelectedItem as AudioDeviceInfo)?.Name;
-        CmbDevice.ItemsSource = items;
-
-        var restored = items.FirstOrDefault(d => d.Name == previousName);
-        CmbDevice.SelectedItem = restored ?? items[0];
+            WindowState = state;
+        }
     }
 
-    private void TxtDeviceFilter_TextChanged(object sender, TextChangedEventArgs e)
+    private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        RefreshDeviceList(TxtDeviceFilter.Text.Trim());
+        // Save normal bounds even when closing from maximized/minimized
+        if (WindowState == System.Windows.WindowState.Normal)
+        {
+            _settings.WindowLeft   = Left;
+            _settings.WindowTop    = Top;
+            _settings.WindowWidth  = Width;
+            _settings.WindowHeight = Height;
+        }
+        _settings.WindowState = WindowState.ToString();
+
+        try
+        {
+            _settings.Save();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Window position could not be saved.\n\n{ex.Message}",
+                "Settings error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    // ── Settings persistence ──────────────────────────────────────────────────
+
+    private static AppSettings LoadSettingsOrDefault()
+    {
+        try
+        {
+            return AppSettings.Load();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Failed to load settings, using defaults.\n\n{ex.Message}",
+                "Settings error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return new AppSettings();
+        }
+    }
+
+    // ── Setup window ──────────────────────────────────────────────────────────
+
+    private void BtnSetup_Click(object sender, RoutedEventArgs e)
+    {
+        var setup = new SetupWindow(_settings) { Owner = this };
+        if (setup.ShowDialog() == true)
+        {
+            _settings = setup.Settings;
+            try
+            {
+                _settings.Save();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Settings were applied but could not be saved to disk.\n\n{ex.Message}",
+                    "Settings error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
     }
 
     // ── Connect ───────────────────────────────────────────────────────────────
 
     private async void BtnConnect_Click(object sender, RoutedEventArgs e)
     {
-        if (!int.TryParse(TxtPort.Text.Trim(), out int port) || port < 1 || port > 65535)
-        {
-            MessageBox.Show("Please enter a valid port number (1–65535).",
-                            "Invalid port", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        string host = TxtHost.Text.Trim();
-        if (string.IsNullOrWhiteSpace(host))
-        {
-            MessageBox.Show("Please enter a server host.", "Invalid host",
-                            MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        var selected = CmbDevice.SelectedItem as AudioDeviceInfo;
-        int deviceNumber = selected?.DeviceNumber ?? 0;
-        // WaveInEvent uses 0 for default; -1 from our sentinel → use 0
+        int deviceNumber = _settings.DeviceNumber;
         if (deviceNumber < 0) deviceNumber = 0;
 
         SetConnecting();
@@ -106,15 +124,15 @@ public partial class MainWindow : Window
 
         try
         {
-            await _service.StartAsync(host, port, deviceNumber);
-            SetConnected(host, port, selected?.Name ?? "default");
+            await _service.StartAsync(_settings.Host, _settings.Port, deviceNumber);
+            SetConnected(_settings.Host, _settings.Port, _settings.DeviceName);
         }
         catch (Exception ex)
         {
             _service.Dispose();
             _service = null;
             SetDisconnected();
-            MessageBox.Show($"Could not connect to {host}:{port}\n\n{ex.Message}",
+            MessageBox.Show($"Could not connect to {_settings.Host}:{_settings.Port}\n\n{ex.Message}",
                             "Connection failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -177,7 +195,7 @@ public partial class MainWindow : Window
         };
         TranscriptPanel.Children.Add(tb);
 
-        if (ChkAutoScroll.IsChecked == true)
+        if (_settings.AutoScroll)
             TranscriptScroller.ScrollToBottom();
     }
 
@@ -199,6 +217,7 @@ public partial class MainWindow : Window
     {
         BtnConnect.IsEnabled    = false;
         BtnDisconnect.IsEnabled = false;
+        BtnSetup.IsEnabled      = false;
         SetStatus("Connecting…", DimBrush);
     }
 
@@ -206,6 +225,7 @@ public partial class MainWindow : Window
     {
         BtnConnect.IsEnabled    = false;
         BtnDisconnect.IsEnabled = true;
+        BtnSetup.IsEnabled      = false;
         SetStatus($"Connected to {host}:{port}  •  {device}", GreenBrush);
     }
 
@@ -213,13 +233,14 @@ public partial class MainWindow : Window
     {
         BtnConnect.IsEnabled    = true;
         BtnDisconnect.IsEnabled = false;
+        BtnSetup.IsEnabled      = true;
         SetStatus("Disconnected", DimBrush);
     }
 
     private void SetStatus(string text, SolidColorBrush dotColor)
     {
-        TxtStatus.Text  = text;
-        StatusDot.Fill  = dotColor;
+        TxtStatus.Text = text;
+        StatusDot.Fill = dotColor;
     }
 
     private void AppendStatusMessage(string msg)
