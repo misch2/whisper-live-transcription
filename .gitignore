@@ -9,3 +9,8 @@ test-*
 visits.csv
 /service_error.log
 /service.log
+/.vs
+/TranscriptionClient/bin/Debug/net9.0-windows
+/TranscriptionClient/obj/Debug/net9.0-windows
+/TranscriptionClient/obj/Release/net9.0-windows
+/TranscriptionClient/obj
