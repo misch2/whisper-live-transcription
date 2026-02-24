@@ -16,3 +16,5 @@ visits.csv
 /TranscriptionClient/obj
 /TranscriptionClient/.vs
 /TranscriptionClient/bin/Release/net9.0-windows
+/TranscriptionClient/Properties/PublishProfiles/FolderProfile.pubxml.user
+/TranscriptionClient/TranscriptionClient.csproj.user

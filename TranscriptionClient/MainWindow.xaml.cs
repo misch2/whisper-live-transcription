@@ -17,6 +17,9 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush DimBrush    = new(Color.FromRgb(0x62, 0x72, 0xA4));
     private static readonly SolidColorBrush FgBrush     = new(Color.FromRgb(0xF8, 0xF8, 0xF2));
 
+    // The last child of TranscriptPanel; always a live (interim) block
+    private TextBlock _liveBlock = null!;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -45,6 +48,8 @@ public partial class MainWindow : Window
         {
             WindowState = state;
         }
+
+        ResetLiveBlock();
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -152,13 +157,15 @@ public partial class MainWindow : Window
     private void BtnClear_Click(object sender, RoutedEventArgs e)
     {
         TranscriptPanel.Children.Clear();
-        TxtLive.Text = "(live transcription will appear here)";
+        ResetLiveBlock();
     }
 
     private void BtnCopyAll_Click(object sender, RoutedEventArgs e)
     {
+        // Exclude the trailing live block from the copy
         var lines = TranscriptPanel.Children
             .OfType<TextBlock>()
+            .Where(tb => tb != _liveBlock && !string.IsNullOrWhiteSpace(tb.Text))
             .Select(tb => tb.Text);
         Clipboard.SetText(string.Join(Environment.NewLine, lines));
     }
@@ -169,35 +176,51 @@ public partial class MainWindow : Window
     {
         if (isFinal)
         {
-            // Commit the live text as a final paragraph
-            if (!string.IsNullOrWhiteSpace(TxtLive.Text) &&
-                TxtLive.Text != "(live transcription will appear here)")
-            {
-                AddFinalLine(TxtLive.Text);
-            }
-            TxtLive.Text = string.Empty;
+            // Commit: turn the live block into a final line, then add a fresh live block
+            CommitLiveBlock();
         }
         else
         {
-            TxtLive.Text = $"[{DateTime.Now:HH:mm:ss}]  {text}";
+            _liveBlock.Text = $"[{DateTime.Now:HH:mm:ss}]  {text}";
+            if (_settings.AutoScroll)
+                TranscriptScroller.ScrollToBottom();
         }
     }
 
-    private void AddFinalLine(string text)
+    // ── Live block helpers ────────────────────────────────────────────────────
+
+    private void ResetLiveBlock()
     {
-        var tb = new TextBlock
-        {
-            Text         = text,
-            Foreground   = FgBrush,
-            FontSize     = 14,
-            TextWrapping = TextWrapping.Wrap,
-            Margin       = new Thickness(0, 0, 0, 8),
-        };
-        TranscriptPanel.Children.Add(tb);
+        _liveBlock = MakeLiveBlock();
+        TranscriptPanel.Children.Add(_liveBlock);
+    }
+
+    private void CommitLiveBlock()
+    {
+        if (string.IsNullOrWhiteSpace(_liveBlock.Text))
+            return;
+
+        // Restyle the existing block to look like a final line
+        _liveBlock.Foreground  = FgBrush;
+        _liveBlock.FontStyle   = FontStyles.Normal;
+        _liveBlock.Margin      = new Thickness(0, 0, 0, 8);
+
+        // Append a new live block after it
+        _liveBlock = MakeLiveBlock();
+        TranscriptPanel.Children.Add(_liveBlock);
 
         if (_settings.AutoScroll)
             TranscriptScroller.ScrollToBottom();
     }
+
+    private static TextBlock MakeLiveBlock() => new()
+    {
+        Text         = string.Empty,
+        Foreground   = AccentBrush,
+        FontSize     = 14,
+        FontStyle    = FontStyles.Italic,
+        TextWrapping = TextWrapping.Wrap,
+    };
 
     // ── Service stopped ───────────────────────────────────────────────────────
 
