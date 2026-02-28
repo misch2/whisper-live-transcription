@@ -1,0 +1,5 @@
+# Root EditorConfig — applies to this solution only
+root = true
+
+[*]
+charset = utf-8
