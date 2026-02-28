@@ -23,12 +23,22 @@ public partial class SetupWindow : Window
             DeviceNumber = current.DeviceNumber,
             DeviceName = current.DeviceName,
             AutoScroll = current.AutoScroll,
+            Theme = current.Theme,
         };
 
         TxtHost.Text = Settings.Host;
         TxtPort.Text = Settings.Port.ToString();
         TxtDeviceFilter.Text = Settings.DeviceFilter;
         ChkAutoScroll.IsChecked = Settings.AutoScroll;
+
+        RbThemeSystem.IsChecked = Settings.Theme == AppThemeMode.System;
+        RbThemeLight.IsChecked  = Settings.Theme == AppThemeMode.Light;
+        RbThemeDark.IsChecked   = Settings.Theme == AppThemeMode.Dark;
+
+        // Live-preview the theme as the user clicks a radio button
+        RbThemeSystem.Checked += (_, _) => ThemeManager.Apply(AppThemeMode.System);
+        RbThemeLight.Checked  += (_, _) => ThemeManager.Apply(AppThemeMode.Light);
+        RbThemeDark.Checked   += (_, _) => ThemeManager.Apply(AppThemeMode.Dark);
 
         Loaded += OnLoaded;
     }
@@ -95,12 +105,17 @@ public partial class SetupWindow : Window
         Settings.DeviceNumber = selected?.DeviceNumber ?? -1;
         Settings.DeviceName = selected?.Name ?? "(System default)";
         Settings.AutoScroll = ChkAutoScroll.IsChecked == true;
+        Settings.Theme = RbThemeLight.IsChecked == true ? AppThemeMode.Light
+                       : RbThemeDark.IsChecked  == true ? AppThemeMode.Dark
+                                                        : AppThemeMode.System;
 
         DialogResult = true;
     }
 
     private void BtnCancel_Click(object sender, RoutedEventArgs e)
     {
+        // Revert any live-preview theme change
+        ThemeManager.Apply(Settings.Theme);
         DialogResult = false;
     }
 }

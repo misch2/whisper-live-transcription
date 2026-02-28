@@ -6,145 +6,46 @@
         mc:Ignorable="d"
         Title="Whisper Live Transcription"
         Height="560" Width="860" MinHeight="260" MinWidth="500"
-        Background="#1E1E2E">
+        FontFamily="Segoe UI" FontSize="13"
+        Background="{DynamicResource SurfaceBg}">
 
-    <Window.Resources>
-        <!-- ── Palette ─────────────────────────────────────────────────── -->
-        <SolidColorBrush x:Key="SurfaceBrush" Color="#2A2A3E"/>
-        <SolidColorBrush x:Key="BorderBrush"  Color="#44475A"/>
-        <SolidColorBrush x:Key="AccentBrush"  Color="#BD93F9"/>
-        <SolidColorBrush x:Key="GreenBrush"   Color="#50FA7B"/>
-        <SolidColorBrush x:Key="RedBrush"     Color="#FF5555"/>
-        <SolidColorBrush x:Key="FgBrush"      Color="#F8F8F2"/>
-        <SolidColorBrush x:Key="FgDimBrush"   Color="#6272A4"/>
-        <SolidColorBrush x:Key="LiveBgBrush"  Color="#282A36"/>
-
-        <!-- ── Button base style ─────────────────────────────────────── -->
-        <Style x:Key="ButtonStyle" TargetType="Button">
-            <Setter Property="Foreground"      Value="#F8F8F2"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding"         Value="18,7"/>
-            <Setter Property="FontSize"        Value="13"/>
-            <Setter Property="FontWeight"      Value="SemiBold"/>
-            <Setter Property="Cursor"          Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="4"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Opacity" Value="0.85"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Opacity" Value="0.70"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.40"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- ── Icon-button style (circular, no padding text) ─────────── -->
-        <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
-            <Setter Property="Padding"   Value="8,6"/>
-            <Setter Property="FontSize"  Value="16"/>
-            <Setter Property="FontWeight" Value="Normal"/>
-        </Style>
-    </Window.Resources>
-
-    <Grid Margin="16">
+    <Grid Margin="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>     <!-- transcript area -->
-            <RowDefinition Height="Auto"/>  <!-- bottom bar: status + buttons -->
-            <RowDefinition Height="Auto"/>  <!-- stats bar -->
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- ══ Transcript area ═══════════════════════════════════════════════ -->
         <Border Grid.Row="0"
-                Background="{StaticResource LiveBgBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1" CornerRadius="6">
+                BorderBrush="{DynamicResource BorderColor}"
+                BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <!-- Toolbar inside the transcript area -->
+                <!-- Toolbar -->
                 <Border Grid.Row="0"
-                        Background="{StaticResource SurfaceBrush}"
-                        CornerRadius="6,6,0,0"
-                        Padding="10,6">
+                        Background="{DynamicResource SurfaceBg}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="0,0,0,1"
+                        Padding="8,5">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Left"
-                                   Text="TRANSCRIPT"
-                                   Foreground="{StaticResource FgDimBrush}"
-                                   FontSize="10" FontWeight="Bold"
+                                   Text="Transcript"
+                                   Foreground="{DynamicResource FgDimBrush}"
+                                   FontSize="11"
                                    VerticalAlignment="Center"/>
                         <Button DockPanel.Dock="Right"
                                 Content="Clear"
-                                Background="Transparent"
-                                Foreground="{StaticResource FgDimBrush}"
-                                BorderThickness="1"
-                                BorderBrush="{StaticResource BorderBrush}"
-                                Padding="10,3" FontSize="11"
-                                Cursor="Hand"
-                                Click="BtnClear_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                            CornerRadius="3"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter HorizontalAlignment="Center"
-                                                          VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                            <Setter Property="Foreground" Value="{StaticResource FgBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
+                                Padding="10,3"
+                                Click="BtnClear_Click"/>
                         <Button DockPanel.Dock="Right" Margin="0,0,6,0"
                                 Content="Copy all"
-                                Background="Transparent"
-                                Foreground="{StaticResource FgDimBrush}"
-                                BorderThickness="1"
-                                BorderBrush="{StaticResource BorderBrush}"
-                                Padding="10,3" FontSize="11"
-                                Cursor="Hand"
-                                Click="BtnCopyAll_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                            CornerRadius="3"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter HorizontalAlignment="Center"
-                                                          VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                            <Setter Property="Foreground" Value="{StaticResource FgBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
+                                Padding="10,3"
+                                Click="BtnCopyAll_Click"/>
                     </DockPanel>
                 </Border>
 
@@ -152,53 +53,49 @@
                 <ScrollViewer Grid.Row="1" x:Name="TranscriptScroller"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
-                              Padding="12,8">
+                              Padding="10,8"
+                              Background="{DynamicResource WindowBg}">
                     <StackPanel x:Name="TranscriptPanel"/>
                 </ScrollViewer>
             </Grid>
         </Border>
 
-        <!-- ══ Bottom bar: status (left) + buttons (right) ═══════════════════ -->
+        <!-- ══ Bottom bar ════════════════════════════════════════════════════ -->
         <Border Grid.Row="1"
-                Background="{StaticResource SurfaceBrush}"
-                CornerRadius="4" Padding="10,5" Margin="0,10,0,0">
+                Background="{DynamicResource SurfaceBg}"
+                BorderBrush="{DynamicResource BorderColor}"
+                BorderThickness="1" Padding="8,5" Margin="0,8,0,0">
             <DockPanel>
-                <!-- Buttons on the right -->
                 <Button DockPanel.Dock="Right"
                         x:Name="BtnSetup"
-                        Content="⚙"
-                        Background="{StaticResource SurfaceBrush}"
-                        Style="{StaticResource IconButtonStyle}"
+                        Content="Settings"
+                        Padding="12,4"
                         ToolTip="Setup"
                         Click="BtnSetup_Click"
                         VerticalAlignment="Center"/>
-                <Button DockPanel.Dock="Right" Margin="0,0,8,0"
+                <Button DockPanel.Dock="Right" Margin="0,0,6,0"
                         x:Name="BtnDisconnect"
-                        Content="■  Disconnect"
-                        Background="{StaticResource RedBrush}"
-                        Style="{StaticResource ButtonStyle}"
+                        Content="Disconnect"
+                        Padding="12,4"
                         IsEnabled="False"
                         VerticalAlignment="Center"
                         Click="BtnDisconnect_Click"/>
-                <Button DockPanel.Dock="Right" Margin="0,0,8,0"
+                <Button DockPanel.Dock="Right" Margin="0,0,6,0"
                         x:Name="BtnConnect"
-                        Content="▶  Connect"
-                        Background="{StaticResource GreenBrush}"
-                        Foreground="#1E1E2E"
-                        Style="{StaticResource ButtonStyle}"
+                        Content="Connect"
+                        Padding="12,4"
                         VerticalAlignment="Center"
                         Click="BtnConnect_Click"/>
 
-                <!-- Status indicator on the left -->
                 <Ellipse x:Name="StatusDot"
                          Width="8" Height="8"
-                         Fill="{StaticResource FgDimBrush}"
+                         Fill="{DynamicResource FgDimBrush}"
                          DockPanel.Dock="Left"
                          Margin="0,0,8,0"
                          VerticalAlignment="Center"/>
                 <TextBlock x:Name="TxtStatus"
                            Text="Disconnected"
-                           Foreground="{StaticResource FgDimBrush}"
+                           Foreground="{DynamicResource FgDimBrush}"
                            FontSize="12"
                            VerticalAlignment="Center"/>
             </DockPanel>
@@ -207,39 +104,25 @@
         <!-- ══ Stats bar ══════════════════════════════════════════════════════ -->
         <Border Grid.Row="2"
                 x:Name="StatsBar"
-                Background="{StaticResource SurfaceBrush}"
-                CornerRadius="4" Padding="10,4" Margin="0,4,0,0"
+                Background="{DynamicResource SurfaceBg}"
+                BorderBrush="{DynamicResource BorderColor}"
+                BorderThickness="1" Padding="8,4" Margin="0,4,0,0"
                 Visibility="Collapsed">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
-                           Text="NET " VerticalAlignment="Center"/>
-                <TextBlock x:Name="TxtNetLag"
-                           Foreground="{StaticResource GreenBrush}" FontSize="11" FontWeight="SemiBold"
-                           Text="— ms" VerticalAlignment="Center" MinWidth="54"/>
+                <TextBlock Foreground="{DynamicResource FgDimBrush}" FontSize="11" Text="Net " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtNetLag" FontSize="11" FontWeight="SemiBold" Text="— ms" VerticalAlignment="Center" MinWidth="54"/>
 
-                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
-                           Text="  QUEUE " VerticalAlignment="Center"/>
-                <TextBlock x:Name="TxtQueueLag"
-                           Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="SemiBold"
-                           Text="— ms" VerticalAlignment="Center" MinWidth="54"/>
+                <TextBlock Foreground="{DynamicResource FgDimBrush}" FontSize="11" Text="  Queue " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtQueueLag" FontSize="11" FontWeight="SemiBold" Text="— ms" VerticalAlignment="Center" MinWidth="54"/>
 
-                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
-                           Text="  TRANSCR " VerticalAlignment="Center"/>
-                <TextBlock x:Name="TxtTranscriptionLag"
-                           Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="SemiBold"
-                           Text="— ms" VerticalAlignment="Center" MinWidth="64"/>
+                <TextBlock Foreground="{DynamicResource FgDimBrush}" FontSize="11" Text="  Transcription " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtTranscriptionLag" FontSize="11" FontWeight="SemiBold" Text="— ms" VerticalAlignment="Center" MinWidth="64"/>
 
-                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
-                           Text="  DEPTH " VerticalAlignment="Center"/>
-                <TextBlock x:Name="TxtQueueDepth"
-                           Foreground="{StaticResource FgBrush}" FontSize="11" FontWeight="SemiBold"
-                           Text="—" VerticalAlignment="Center" MinWidth="20"/>
+                <TextBlock Foreground="{DynamicResource FgDimBrush}" FontSize="11" Text="  Depth " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtQueueDepth" FontSize="11" FontWeight="SemiBold" Text="—" VerticalAlignment="Center" MinWidth="20"/>
 
-                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
-                           Text="  SKIPPED " VerticalAlignment="Center"/>
-                <TextBlock x:Name="TxtChunksSkipped"
-                           Foreground="{StaticResource RedBrush}" FontSize="11" FontWeight="SemiBold"
-                           Text="—" VerticalAlignment="Center" MinWidth="20"/>
+                <TextBlock Foreground="{DynamicResource FgDimBrush}" FontSize="11" Text="  Skipped " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtChunksSkipped" FontSize="11" FontWeight="SemiBold" Text="—" VerticalAlignment="Center" MinWidth="20"/>
             </StackPanel>
         </Border>
     </Grid>

@@ -25,6 +25,7 @@ public class AppSettings
     public int DeviceNumber { get; set; } = 0;
     public string DeviceName { get; set; } = "(System default)";
     public bool AutoScroll { get; set; } = true;
+    public AppThemeMode Theme { get; set; } = AppThemeMode.System;
 
     // ── Main window geometry ──────────────────────────────────────────────────
     public double? WindowLeft { get; set; } = null;

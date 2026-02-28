@@ -9,19 +9,23 @@ public partial class MainWindow : Window
     private TranscriptionService? _service;
     private AppSettings _settings = LoadSettingsOrDefault();
 
-    // Colours (match XAML palette)
-    private static readonly SolidColorBrush GreenBrush  = new(Color.FromRgb(0x50, 0xFA, 0x7B));
-    private static readonly SolidColorBrush RedBrush    = new(Color.FromRgb(0xFF, 0x55, 0x55));
-    private static readonly SolidColorBrush AccentBrush = new(Color.FromRgb(0xBD, 0x93, 0xF9));
-    private static readonly SolidColorBrush DimBrush    = new(Color.FromRgb(0x62, 0x72, 0xA4));
-    private static readonly SolidColorBrush FgBrush     = new(Color.FromRgb(0xF8, 0xF8, 0xF2));
-
     // Thresholds for colour-coding network / queue lag
     private const int LagWarnMs = 300;
     private const int LagBadMs  = 800;
 
     // The last child of TranscriptPanel; always a live (interim) block
     private TextBlock _liveBlock = null!;
+
+    // ── Theme-aware brush helpers ─────────────────────────────────────────────
+
+    private SolidColorBrush ThemeBrush(string key) =>
+        (SolidColorBrush)Application.Current.Resources[key];
+
+    private SolidColorBrush GreenBrush => ThemeBrush("GreenBrush");
+    private SolidColorBrush RedBrush   => ThemeBrush("RedBrush");
+    private SolidColorBrush AmberBrush => ThemeBrush("AmberBrush");
+    private SolidColorBrush DimBrush   => ThemeBrush("FgDimBrush");
+    private SolidColorBrush FgBrush    => ThemeBrush("FgBrush");
 
     public MainWindow()
     {
@@ -34,6 +38,8 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        ThemeManager.Initialize(_settings.Theme);
+
         if (_settings.WindowLeft.HasValue && _settings.WindowTop.HasValue)
         {
             Left = _settings.WindowLeft.Value;
@@ -104,6 +110,7 @@ public partial class MainWindow : Window
         if (setup.ShowDialog() == true)
         {
             _settings = setup.Settings;
+            ThemeManager.Apply(_settings.Theme);
             try
             {
                 _settings.Save();
@@ -214,8 +221,8 @@ public partial class MainWindow : Window
     }
 
     private SolidColorBrush LagBrush(int ms) =>
-        ms >= LagBadMs  ? RedBrush    :
-        ms >= LagWarnMs ? AccentBrush :
+        ms >= LagBadMs  ? RedBrush   :
+        ms >= LagWarnMs ? AmberBrush :
                           GreenBrush;
 
     // ── Live block helpers ────────────────────────────────────────────────────
@@ -244,10 +251,10 @@ public partial class MainWindow : Window
             TranscriptScroller.ScrollToBottom();
     }
 
-    private static TextBlock MakeLiveBlock() => new()
+    private TextBlock MakeLiveBlock() => new()
     {
         Text = string.Empty,
-        Foreground = AccentBrush,
+        Foreground = DimBrush,
         FontSize = 14,
         FontStyle = FontStyles.Italic,
         TextWrapping = TextWrapping.Wrap,

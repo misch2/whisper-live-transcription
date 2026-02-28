@@ -12,4 +12,12 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Theme dictionaries are loaded at runtime; treat as content, not compiled Page -->
+    <Page Remove="Themes\Light.xaml" />
+    <Page Remove="Themes\Dark.xaml" />
+    <Resource Include="Themes\Light.xaml" />
+    <Resource Include="Themes\Dark.xaml" />
+  </ItemGroup>
+
 </Project>

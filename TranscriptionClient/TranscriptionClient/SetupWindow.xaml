@@ -5,183 +5,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
         Title="Setup – Whisper Live Transcription"
-        Height="360" Width="480"
-        MinHeight="360"
+        Height="400" Width="480"
+        MinHeight="400"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
-        Background="#1E1E2E">
-
-    <Window.Resources>
-        <SolidColorBrush x:Key="SurfaceBrush" Color="#2A2A3E"/>
-        <SolidColorBrush x:Key="BorderBrush"  Color="#44475A"/>
-        <SolidColorBrush x:Key="AccentBrush"  Color="#BD93F9"/>
-        <SolidColorBrush x:Key="GreenBrush"   Color="#50FA7B"/>
-        <SolidColorBrush x:Key="FgBrush"      Color="#F8F8F2"/>
-        <SolidColorBrush x:Key="FgDimBrush"   Color="#6272A4"/>
-
-        <Style x:Key="LabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource FgDimBrush}"/>
-            <Setter Property="FontSize"   Value="11"/>
-            <Setter Property="Margin"     Value="0,0,0,3"/>
-        </Style>
-
-        <Style x:Key="InputStyle" TargetType="TextBox">
-            <Setter Property="Background"               Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="Foreground"               Value="{StaticResource FgBrush}"/>
-            <Setter Property="BorderBrush"              Value="{StaticResource BorderBrush}"/>
-            <Setter Property="BorderThickness"          Value="1"/>
-            <Setter Property="Padding"                  Value="6,4"/>
-            <Setter Property="FontSize"                 Value="13"/>
-            <Setter Property="CaretBrush"               Value="{StaticResource FgBrush}"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-        </Style>
-
-        <!-- ── ComboBox item container ───────────────────────────────── -->
-        <Style x:Key="ComboItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Background"  Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="Foreground"  Value="{StaticResource FgBrush}"/>
-            <Setter Property="Padding"     Value="8,5"/>
-            <Setter Property="FontSize"    Value="13"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="Foreground" Value="#1E1E2E"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="Foreground" Value="#1E1E2E"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- ── ComboBox full dark template ──────────────────────────── -->
-        <Style x:Key="ComboStyle" TargetType="ComboBox">
-            <Setter Property="Foreground"          Value="{StaticResource FgBrush}"/>
-            <Setter Property="Background"          Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="BorderBrush"         Value="{StaticResource BorderBrush}"/>
-            <Setter Property="BorderThickness"     Value="1"/>
-            <Setter Property="FontSize"            Value="13"/>
-            <Setter Property="ItemContainerStyle"  Value="{StaticResource ComboItemStyle}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBox">
-                        <Grid>
-                            <Border x:Name="MainBorder"
-                                    Background="{TemplateBinding Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="3">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="28"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Selected item text -->
-                                    <ContentPresenter Grid.Column="0"
-                                                      Margin="8,5,4,5"
-                                                      Content="{TemplateBinding SelectionBoxItem}"
-                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                                      VerticalAlignment="Center"
-                                                      TextBlock.Foreground="{TemplateBinding Foreground}"/>
-
-                                    <!-- Drop-down arrow -->
-                                    <Border Grid.Column="1"
-                                            Background="Transparent">
-                                        <Path HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Data="M 0 0 L 6 6 L 12 0 Z"
-                                              Fill="{StaticResource FgDimBrush}"/>
-                                    </Border>
-
-                                    <!-- Toggle button overlay (captures clicks) -->
-                                    <ToggleButton Grid.Column="0" Grid.ColumnSpan="2"
-                                                  Focusable="False"
-                                                  IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-                                                  Background="Transparent"
-                                                  BorderThickness="0"
-                                                  Cursor="Hand"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Drop-down popup -->
-                            <Popup x:Name="PART_Popup"
-                                   IsOpen="{TemplateBinding IsDropDownOpen}"
-                                   AllowsTransparency="True"
-                                   Focusable="False"
-                                   PopupAnimation="Slide"
-                                   Placement="Bottom">
-                                <Border Background="{StaticResource SurfaceBrush}"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="3"
-                                        MinWidth="{TemplateBinding ActualWidth}">
-                                    <ScrollViewer MaxHeight="200"
-                                                  VerticalScrollBarVisibility="Auto"
-                                                  HorizontalScrollBarVisibility="Disabled"
-                                                  Background="Transparent">
-                                        <ItemsPresenter/>
-                                    </ScrollViewer>
-                                </Border>
-                            </Popup>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.40"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="ButtonStyle" TargetType="Button">
-            <Setter Property="Foreground"      Value="#F8F8F2"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding"         Value="18,7"/>
-            <Setter Property="FontSize"        Value="13"/>
-            <Setter Property="FontWeight"      Value="SemiBold"/>
-            <Setter Property="Cursor"          Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="4"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Opacity" Value="0.85"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Opacity" Value="0.70"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.40"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
+        FontFamily="Segoe UI" FontSize="13"
+        Background="{DynamicResource SurfaceBg}">
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -194,6 +23,8 @@
             <RowDefinition Height="Auto"/>  <!-- device picker -->
             <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>  <!-- auto-scroll -->
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>  <!-- theme -->
             <RowDefinition Height="*" MinHeight="16"/>
             <RowDefinition Height="Auto"/>  <!-- buttons -->
         </Grid.RowDefinitions>
@@ -201,8 +32,8 @@
         <!-- Title -->
         <TextBlock Grid.Row="0"
                    Text="Setup"
-                   Foreground="{StaticResource AccentBrush}"
-                   FontSize="17" FontWeight="Bold"/>
+                   Foreground="{DynamicResource FgBrush}"
+                   FontSize="17" FontWeight="SemiBold"/>
 
         <!-- Host + Port row -->
         <Grid Grid.Row="2">
@@ -216,11 +47,15 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Server host" Style="{StaticResource LabelStyle}"/>
-            <TextBox   Grid.Row="1" Grid.Column="0" x:Name="TxtHost" Style="{StaticResource InputStyle}"/>
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Server host"
+                       Foreground="{DynamicResource FgDimBrush}"
+                       FontSize="11" Margin="0,0,0,3"/>
+            <TextBox   Grid.Row="1" Grid.Column="0" x:Name="TxtHost" Padding="5,4"/>
 
-            <TextBlock Grid.Row="0" Grid.Column="2" Text="Port" Style="{StaticResource LabelStyle}"/>
-            <TextBox   Grid.Row="1" Grid.Column="2" x:Name="TxtPort" Style="{StaticResource InputStyle}"/>
+            <TextBlock Grid.Row="0" Grid.Column="2" Text="Port"
+                       Foreground="{DynamicResource FgDimBrush}"
+                       FontSize="11" Margin="0,0,0,3"/>
+            <TextBox   Grid.Row="1" Grid.Column="2" x:Name="TxtPort" Padding="5,4"/>
         </Grid>
 
         <!-- Device name filter -->
@@ -229,9 +64,11 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Text="Device name filter (prefix)" Style="{StaticResource LabelStyle}"/>
+            <TextBlock Grid.Row="0" Text="Device name filter (prefix)"
+                       Foreground="{DynamicResource FgDimBrush}"
+                       FontSize="11" Margin="0,0,0,3"/>
             <TextBox   Grid.Row="1" x:Name="TxtDeviceFilter"
-                       Style="{StaticResource InputStyle}"
+                       Padding="5,4"
                        ToolTip="Filter devices by name prefix. Leave empty to show all."
                        TextChanged="TxtDeviceFilter_TextChanged"/>
         </Grid>
@@ -242,9 +79,10 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Text="Audio input device" Style="{StaticResource LabelStyle}"/>
+            <TextBlock Grid.Row="0" Text="Audio input device"
+                       Foreground="{DynamicResource FgDimBrush}"
+                       FontSize="11" Margin="0,0,0,3"/>
             <ComboBox  Grid.Row="1" x:Name="CmbDevice"
-                       Style="{StaticResource ComboStyle}"
                        DisplayMemberPath="Name"/>
         </Grid>
 
@@ -252,23 +90,50 @@
         <CheckBox Grid.Row="8"
                   x:Name="ChkAutoScroll"
                   Content="Auto-scroll transcript"
-                  Foreground="{StaticResource FgBrush}"
+                  Foreground="{DynamicResource FgBrush}"
                   FontSize="12"/>
 
+        <!-- Theme selector -->
+        <StackPanel Grid.Row="10" Orientation="Horizontal">
+            <TextBlock Text="Theme:"
+                       Foreground="{DynamicResource FgDimBrush}"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       Margin="0,0,10,0"/>
+            <RadioButton x:Name="RbThemeSystem"
+                         Content="System"
+                         Foreground="{DynamicResource FgBrush}"
+                         FontSize="12"
+                         GroupName="Theme"
+                         Margin="0,0,12,0"
+                         VerticalAlignment="Center"/>
+            <RadioButton x:Name="RbThemeLight"
+                         Content="Light"
+                         Foreground="{DynamicResource FgBrush}"
+                         FontSize="12"
+                         GroupName="Theme"
+                         Margin="0,0,12,0"
+                         VerticalAlignment="Center"/>
+            <RadioButton x:Name="RbThemeDark"
+                         Content="Dark"
+                         Foreground="{DynamicResource FgBrush}"
+                         FontSize="12"
+                         GroupName="Theme"
+                         VerticalAlignment="Center"/>
+        </StackPanel>
+
         <!-- OK / Cancel -->
-        <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="12" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="BtnOk"
                     Content="OK"
-                    Background="{StaticResource AccentBrush}"
-                    Foreground="#1E1E2E"
-                    Style="{StaticResource ButtonStyle}"
+                    Padding="18,6"
                     Margin="0,0,8,0"
+                    IsDefault="True"
                     Click="BtnOk_Click"/>
             <Button x:Name="BtnCancel"
                     Content="Cancel"
-                    Background="{StaticResource SurfaceBrush}"
-                    Foreground="{StaticResource FgBrush}"
-                    Style="{StaticResource ButtonStyle}"
+                    Padding="18,6"
+                    IsCancel="True"
                     Click="BtnCancel_Click"/>
         </StackPanel>
     </Grid>
