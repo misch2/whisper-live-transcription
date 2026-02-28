@@ -12,8 +12,8 @@ internal static class Protocol
 {
     public const int DefaultPort = 43007;
 
-    public const byte MsgConfig        = 1;
-    public const byte MsgAudio         = 2;
+    public const byte MsgConfig = 1;
+    public const byte MsgAudio = 2;
     public const byte MsgTranscription = 3;
 
     private const int HeaderSize = 5; // 1 (type) + 4 (length)
@@ -44,7 +44,7 @@ internal static class Protocol
             return (0, null);
 
         byte msgType = header[0];
-        uint length  = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(1));
+        uint length = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(1));
 
         if (length == 0)
             return (msgType, Array.Empty<byte>());

@@ -1,7 +1,7 @@
+using NAudio.Wave;
 using System.IO;
 using System.Net.Sockets;
 using System.Text.Json;
-using NAudio.Wave;
 
 namespace TranscriptionClient;
 
@@ -13,11 +13,11 @@ namespace TranscriptionClient;
 internal sealed class TranscriptionService : IDisposable
 {
     // ?? Audio constants (must match server expectations) ??????????????????????
-    private const int SampleRate   = 16_000;
-    private const int Channels     = 1;
+    private const int SampleRate = 16_000;
+    private const int Channels = 1;
     private const int BitsPerSample = 16;
-    private const int StepInSec    = 1;          // seconds of audio per network message
-    private const int ChunkBytes   = SampleRate * Channels * (BitsPerSample / 8) * StepInSec;
+    private const int StepInSec = 1;          // seconds of audio per network message
+    private const int ChunkBytes = SampleRate * Channels * (BitsPerSample / 8) * StepInSec;
 
     // ?? Events ?????????????????????????????????????????????????????????????????
 
@@ -28,14 +28,14 @@ internal sealed class TranscriptionService : IDisposable
     public event Action<string?>? Stopped;
 
     // ?? State ?????????????????????????????????????????????????????????????????
-    private TcpClient?         _tcpClient;
-    private NetworkStream?     _stream;
-    private WaveInEvent?       _waveIn;
+    private TcpClient? _tcpClient;
+    private NetworkStream? _stream;
+    private WaveInEvent? _waveIn;
     private CancellationTokenSource? _cts;
 
-    private readonly object   _audioLock  = new();
+    private readonly object _audioLock = new();
     private readonly List<byte> _audioBuffer = new();
-    private bool              _disposed;
+    private bool _disposed;
     private readonly SynchronizationContext _syncCtx;
 
     public TranscriptionService()
@@ -67,9 +67,9 @@ internal sealed class TranscriptionService : IDisposable
         // ?? Send config ???????????????????????????????????????????????????????
         var config = new
         {
-            sample_rate  = SampleRate,
-            channels     = Channels,
-            step_in_sec  = StepInSec,
+            sample_rate = SampleRate,
+            channels = Channels,
+            step_in_sec = StepInSec,
         };
         var configJson = JsonSerializer.SerializeToUtf8Bytes(config);
         await Protocol.SendMessageAsync(_stream, Protocol.MsgConfig, configJson, ct);
@@ -78,10 +78,10 @@ internal sealed class TranscriptionService : IDisposable
         _waveIn = new WaveInEvent
         {
             DeviceNumber = deviceNumber,
-            WaveFormat   = new WaveFormat(SampleRate, BitsPerSample, Channels),
+            WaveFormat = new WaveFormat(SampleRate, BitsPerSample, Channels),
             BufferMilliseconds = StepInSec * 1000,
         };
-        _waveIn.DataAvailable    += OnDataAvailable;
+        _waveIn.DataAvailable += OnDataAvailable;
         _waveIn.RecordingStopped += OnRecordingStopped;
         _waveIn.StartRecording();
 
@@ -174,7 +174,7 @@ internal sealed class TranscriptionService : IDisposable
                     try
                     {
                         using var doc = JsonDocument.Parse(payload);
-                        var text    = doc.RootElement.GetProperty("text").GetString() ?? string.Empty;
+                        var text = doc.RootElement.GetProperty("text").GetString() ?? string.Empty;
                         var isFinal = doc.RootElement.TryGetProperty("is_final", out var f) && f.GetBoolean();
                         RaiseTranscription(text, isFinal);
                     }

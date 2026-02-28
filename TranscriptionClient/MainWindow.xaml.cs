@@ -1,7 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Shapes;
 
 namespace TranscriptionClient;
 
@@ -11,11 +10,11 @@ public partial class MainWindow : Window
     private AppSettings _settings = LoadSettingsOrDefault();
 
     // Colours (match XAML palette)
-    private static readonly SolidColorBrush GreenBrush  = new(Color.FromRgb(0x50, 0xFA, 0x7B));
-    private static readonly SolidColorBrush RedBrush    = new(Color.FromRgb(0xFF, 0x55, 0x55));
+    private static readonly SolidColorBrush GreenBrush = new(Color.FromRgb(0x50, 0xFA, 0x7B));
+    private static readonly SolidColorBrush RedBrush = new(Color.FromRgb(0xFF, 0x55, 0x55));
     private static readonly SolidColorBrush AccentBrush = new(Color.FromRgb(0xBD, 0x93, 0xF9));
-    private static readonly SolidColorBrush DimBrush    = new(Color.FromRgb(0x62, 0x72, 0xA4));
-    private static readonly SolidColorBrush FgBrush     = new(Color.FromRgb(0xF8, 0xF8, 0xF2));
+    private static readonly SolidColorBrush DimBrush = new(Color.FromRgb(0x62, 0x72, 0xA4));
+    private static readonly SolidColorBrush FgBrush = new(Color.FromRgb(0xF8, 0xF8, 0xF2));
 
     // The last child of TranscriptPanel; always a live (interim) block
     private TextBlock _liveBlock = null!;
@@ -23,7 +22,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Loaded  += OnLoaded;
+        Loaded += OnLoaded;
         Closing += OnClosing;
     }
 
@@ -34,7 +33,7 @@ public partial class MainWindow : Window
         if (!double.IsNaN(_settings.WindowLeft) && !double.IsNaN(_settings.WindowTop))
         {
             Left = _settings.WindowLeft;
-            Top  = _settings.WindowTop;
+            Top = _settings.WindowTop;
         }
 
         if (!double.IsNaN(_settings.WindowWidth) && _settings.WindowWidth >= MinWidth)
@@ -57,9 +56,9 @@ public partial class MainWindow : Window
         // Save normal bounds even when closing from maximized/minimized
         if (WindowState == System.Windows.WindowState.Normal)
         {
-            _settings.WindowLeft   = Left;
-            _settings.WindowTop    = Top;
-            _settings.WindowWidth  = Width;
+            _settings.WindowLeft = Left;
+            _settings.WindowTop = Top;
+            _settings.WindowWidth = Width;
             _settings.WindowHeight = Height;
         }
         _settings.WindowState = WindowState.ToString();
@@ -125,7 +124,7 @@ public partial class MainWindow : Window
 
         _service = new TranscriptionService();
         _service.TranscriptionReceived += OnTranscriptionReceived;
-        _service.Stopped               += OnServiceStopped;
+        _service.Stopped += OnServiceStopped;
 
         try
         {
@@ -201,9 +200,9 @@ public partial class MainWindow : Window
             return;
 
         // Restyle the existing block to look like a final line
-        _liveBlock.Foreground  = FgBrush;
-        _liveBlock.FontStyle   = FontStyles.Normal;
-        _liveBlock.Margin      = new Thickness(0, 0, 0, 8);
+        _liveBlock.Foreground = FgBrush;
+        _liveBlock.FontStyle = FontStyles.Normal;
+        _liveBlock.Margin = new Thickness(0, 0, 0, 8);
 
         // Append a new live block after it
         _liveBlock = MakeLiveBlock();
@@ -215,10 +214,10 @@ public partial class MainWindow : Window
 
     private static TextBlock MakeLiveBlock() => new()
     {
-        Text         = string.Empty,
-        Foreground   = AccentBrush,
-        FontSize     = 14,
-        FontStyle    = FontStyles.Italic,
+        Text = string.Empty,
+        Foreground = AccentBrush,
+        FontSize = 14,
+        FontStyle = FontStyles.Italic,
         TextWrapping = TextWrapping.Wrap,
     };
 
@@ -238,25 +237,25 @@ public partial class MainWindow : Window
 
     private void SetConnecting()
     {
-        BtnConnect.IsEnabled    = false;
+        BtnConnect.IsEnabled = false;
         BtnDisconnect.IsEnabled = false;
-        BtnSetup.IsEnabled      = false;
+        BtnSetup.IsEnabled = false;
         SetStatus("Connecting…", DimBrush);
     }
 
     private void SetConnected(string host, int port, string device)
     {
-        BtnConnect.IsEnabled    = false;
+        BtnConnect.IsEnabled = false;
         BtnDisconnect.IsEnabled = true;
-        BtnSetup.IsEnabled      = false;
+        BtnSetup.IsEnabled = false;
         SetStatus($"Connected to {host}:{port}  •  {device}", GreenBrush);
     }
 
     private void SetDisconnected()
     {
-        BtnConnect.IsEnabled    = true;
+        BtnConnect.IsEnabled = true;
         BtnDisconnect.IsEnabled = false;
-        BtnSetup.IsEnabled      = true;
+        BtnSetup.IsEnabled = true;
         SetStatus("Disconnected", DimBrush);
     }
 

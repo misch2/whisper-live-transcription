@@ -1,6 +1,6 @@
+using NAudio.Wave;
 using System.Windows;
 using System.Windows.Controls;
-using NAudio.Wave;
 
 namespace TranscriptionClient;
 
@@ -17,17 +17,17 @@ public partial class SetupWindow : Window
         // Work on a copy so Cancel truly cancels
         Settings = new AppSettings
         {
-            Host         = current.Host,
-            Port         = current.Port,
+            Host = current.Host,
+            Port = current.Port,
             DeviceFilter = current.DeviceFilter,
             DeviceNumber = current.DeviceNumber,
-            DeviceName   = current.DeviceName,
-            AutoScroll   = current.AutoScroll,
+            DeviceName = current.DeviceName,
+            AutoScroll = current.AutoScroll,
         };
 
-        TxtHost.Text          = Settings.Host;
-        TxtPort.Text          = Settings.Port.ToString();
-        TxtDeviceFilter.Text  = Settings.DeviceFilter;
+        TxtHost.Text = Settings.Host;
+        TxtPort.Text = Settings.Port.ToString();
+        TxtDeviceFilter.Text = Settings.DeviceFilter;
         ChkAutoScroll.IsChecked = Settings.AutoScroll;
 
         Loaded += OnLoaded;
@@ -89,12 +89,12 @@ public partial class SetupWindow : Window
 
         var selected = CmbDevice.SelectedItem as AudioDeviceInfo;
 
-        Settings.Host         = host;
-        Settings.Port         = port;
+        Settings.Host = host;
+        Settings.Port = port;
         Settings.DeviceFilter = TxtDeviceFilter.Text.Trim();
         Settings.DeviceNumber = selected?.DeviceNumber ?? -1;
-        Settings.DeviceName   = selected?.Name ?? "(System default)";
-        Settings.AutoScroll   = ChkAutoScroll.IsChecked == true;
+        Settings.DeviceName = selected?.Name ?? "(System default)";
+        Settings.AutoScroll = ChkAutoScroll.IsChecked == true;
 
         DialogResult = true;
     }

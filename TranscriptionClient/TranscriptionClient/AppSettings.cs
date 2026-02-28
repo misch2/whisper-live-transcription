@@ -1,35 +1,37 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 
 namespace TranscriptionClient;
 
 /// <summary>
 /// Shared mutable state that flows between MainWindow and SetupWindow.
-/// Persisted as JSON next to the executable.
+/// Persisted as JSON in the user's roaming AppData folder.
 /// </summary>
 public class AppSettings
 {
     private static readonly string FilePath = Path.Combine(
-        AppContext.BaseDirectory, "settings.json");
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "WhisperLiveTranscription",
+        "settings.json");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
     };
 
-    public string Host         { get; set; } = "localhost";
-    public int    Port         { get; set; } = 43007;
+    public string Host { get; set; } = "localhost";
+    public int Port { get; set; } = 43007;
     public string DeviceFilter { get; set; } = "Voicemeeter Out B1";
-    public int    DeviceNumber { get; set; } = 0;
-    public string DeviceName   { get; set; } = "(System default)";
-    public bool   AutoScroll   { get; set; } = true;
+    public int DeviceNumber { get; set; } = 0;
+    public string DeviceName { get; set; } = "(System default)";
+    public bool AutoScroll { get; set; } = true;
 
-    // ?? Main window geometry ??????????????????????????????????????????????????
-    public double WindowLeft   { get; set; } = double.NaN;
-    public double WindowTop    { get; set; } = double.NaN;
-    public double WindowWidth  { get; set; } = double.NaN;
+    // ── Main window geometry ──────────────────────────────────────────────────
+    public double WindowLeft { get; set; } = double.NaN;
+    public double WindowTop { get; set; } = double.NaN;
+    public double WindowWidth { get; set; } = double.NaN;
     public double WindowHeight { get; set; } = double.NaN;
-    public string WindowState  { get; set; } = nameof(System.Windows.WindowState.Normal);
+    public string WindowState { get; set; } = nameof(System.Windows.WindowState.Normal);
 
     /// <summary>
     /// Loads settings from disk. Throws on failure so the caller can report the error.
@@ -48,6 +50,7 @@ public class AppSettings
     /// </summary>
     public void Save()
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         string json = JsonSerializer.Serialize(this, JsonOptions);
         File.WriteAllText(FilePath, json);
     }
