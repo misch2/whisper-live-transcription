@@ -6,9 +6,9 @@ Accepts a single TCP client at a time, receives raw PCM audio,
 transcribes it with faster-whisper, streams results back, and
 optionally saves the audio as a WAV file.
 
-The Whisper model is loaded once on startup.  Processing only runs
-while a client is connected — when the client disconnects the server
-idles with near-zero CPU/GPU use until the next connection.
+The Whisper model is loaded on demand when the first client connects and
+unloaded automatically after the server has been idle (no connected client)
+for MODEL_IDLE_TIMEOUT_SEC seconds (default: 60).
 
 Usage
 ─────
@@ -27,6 +27,7 @@ Windows service (via NSSM)
 """
 
 import argparse
+import gc
 import io
 import json
 import os
@@ -150,6 +151,9 @@ def setup_logging() -> None:
 class TranscriptionServer:
     """Single-client TCP server for live audio transcription."""
 
+    # How long to keep the model in memory after the last client disconnects.
+    MODEL_IDLE_TIMEOUT_SEC = 60
+
     def __init__(
         self,
         host: str = DEFAULT_HOST,
@@ -164,6 +168,8 @@ class TranscriptionServer:
         self.whisper: Optional[WhisperModel] = None
         self._server_socket: Optional[socket.socket] = None
         self._client_socket: Optional[socket.socket] = None
+        self._unload_timer: Optional[threading.Timer] = None
+        self._model_lock = threading.Lock()
 
     # ── Model loading ─────────────────────────────────────────────────────
     def _load_model(self):
@@ -198,10 +204,34 @@ class TranscriptionServer:
         )
         print("Whisper model ready.\n")
 
+    def _ensure_model_loaded(self):
+        """Load the model if it isn't already in memory (thread-safe)."""
+        with self._model_lock:
+            if self.whisper is None:
+                self._load_model()
+
+    def _unload_model(self):
+        """Release the model and free memory."""
+        with self._model_lock:
+            if self.whisper is not None:
+                print("No client connected for 60 s — unloading Whisper model.")
+                self.whisper = None
+                gc.collect()
+
+    def _cancel_unload_timer(self):
+        if self._unload_timer is not None:
+            self._unload_timer.cancel()
+            self._unload_timer = None
+
+    def _schedule_unload(self):
+        self._cancel_unload_timer()
+        self._unload_timer = threading.Timer(self.MODEL_IDLE_TIMEOUT_SEC, self._unload_model)
+        self._unload_timer.daemon = True
+        self._unload_timer.start()
+
     # ── Accept loop ───────────────────────────────────────────────────────
     def start(self):
-        """Load the model and start accepting connections (blocks)."""
-        self._load_model()
+        """Start accepting connections (blocks). Model is loaded on demand."""
         self.running = True
 
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -221,6 +251,9 @@ class TranscriptionServer:
             except OSError:
                 break
 
+            self._cancel_unload_timer()
+            self._ensure_model_loaded()
+
             self._client_socket = client_sock
             print(f"\n{'=' * 60}")
             print(f"  Client connected: {addr}")
@@ -234,8 +267,11 @@ class TranscriptionServer:
                 self._client_socket = None
 
             print(f"\nClient {addr} disconnected.")
+            self._schedule_unload()
+            print(f"Model will be unloaded in {self.MODEL_IDLE_TIMEOUT_SEC} s if no new client connects.")
             print("Waiting for client...\n")
 
+        self._cancel_unload_timer()
         if self._server_socket:
             self._server_socket.close()
         print("Server stopped.")
@@ -243,6 +279,7 @@ class TranscriptionServer:
     def stop(self):
         """Signal the server to shut down (can be called from any thread)."""
         self.running = False
+        self._cancel_unload_timer()
         for s in (self._client_socket, self._server_socket):
             if s:
                 try:
