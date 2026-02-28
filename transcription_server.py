@@ -19,13 +19,20 @@ Windows service (via NSSM)
 ──────────────────────────
   nssm install WhisperTranscription "<venv>\\python.exe" "transcription_server.py --host 0.0.0.0 --port 43007"
   nssm start WhisperTranscription
+
+  AppStdout / AppStderr do NOT need to be configured — the server
+  automatically writes timestamped logs to:
+    %LOCALAPPDATA%\\WhisperLiveTranscription\\server.log
+    %LOCALAPPDATA%\\WhisperLiveTranscription\\server_error.log
 """
 
 import argparse
+import io
 import json
 import os
 import queue
 import socket
+import sys
 import threading
 import time
 from datetime import datetime
@@ -56,6 +63,85 @@ WHISPER_COMPUTE_TYPE = "float16"
 # ── Transcription window ─────────────────────────────────────────────────────
 WINDOW_LENGTH_SEC = 6
 MAX_SENTENCE_CHARACTERS = 80
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Logging redirect
+# ══════════════════════════════════════════════════════════════════════════════
+class TimestampedTee(io.TextIOBase):
+    """
+    Wraps an existing stream so every *complete line* written to it gets a
+    ``[YYYY-MM-DD HH:MM:SS] `` prefix and is simultaneously written to a log
+    file.  The original stream is kept as a tee so interactive runs continue
+    to show output on the terminal.
+    """
+
+    def __init__(self, original: io.TextIOBase, log_file: io.TextIOBase) -> None:
+        super().__init__()
+        self._orig = original
+        self._log = log_file
+        self._buf = ""
+        self._lock = threading.Lock()
+
+    # TextIOBase.write must return the number of characters accepted.
+    def write(self, text: str) -> int:
+        if not text:
+            return 0
+        with self._lock:
+            self._buf += text
+            while "\n" in self._buf:
+                line, self._buf = self._buf.split("\n", 1)
+                self._emit(line + "\n")
+        return len(text)
+
+    def flush(self) -> None:
+        with self._lock:
+            if self._buf:
+                self._emit(self._buf)
+                self._buf = ""
+        self._orig.flush()
+        self._log.flush()
+
+    def _emit(self, line: str) -> None:
+        stamped = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {line}"
+        self._orig.write(stamped)
+        self._orig.flush()
+        self._log.write(stamped)
+        self._log.flush()
+
+    # Preserve encoding/errors so libraries that inspect sys.stdout still work.
+    @property
+    def encoding(self):
+        return self._orig.encoding
+
+    @property
+    def errors(self):
+        return self._orig.errors
+
+
+def setup_logging() -> None:
+    """
+    Redirect sys.stdout and sys.stderr to TimestampedTee instances that write
+    to ``%LOCALAPPDATA%\\WhisperLiveTranscription\\server.log`` (stdout) and
+    ``server_error.log`` (stderr).  The directory is created if absent.
+    """
+    local_app_data = os.environ.get("LOCALAPPDATA") or os.path.join(
+        os.path.expanduser("~"), "AppData", "Local"
+    )
+    log_dir = os.path.join(local_app_data, "WhisperLiveTranscription")
+    os.makedirs(log_dir, exist_ok=True)
+
+    stdout_log = open(
+        os.path.join(log_dir, "server.log"), "a", encoding="utf-8", buffering=1
+    )
+    stderr_log = open(
+        os.path.join(log_dir, "server_error.log"), "a", encoding="utf-8", buffering=1
+    )
+
+    sys.stdout = TimestampedTee(sys.__stdout__, stdout_log)
+    sys.stderr = TimestampedTee(sys.__stderr__, stderr_log)
+
+    print(f"Logging to: {log_dir}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -289,10 +375,6 @@ class TranscriptionServer:
 
             stats["transcription"].append(transcription_lag_ms / 1000.0)
 
-            # Mirror on server console
-            ts = time.strftime("%H:%M:%S")
-            print(f"\r{ts} {text}", end="", flush=True)
-
             self._send_transcription(sock, text, is_final=False, stop=stop)
             self._send_stats(
                 sock,
@@ -344,6 +426,8 @@ class TranscriptionServer:
 #  CLI entry-point
 # ══════════════════════════════════════════════════════════════════════════════
 def main():
+    setup_logging()
+
     parser = argparse.ArgumentParser(description="Whisper Live Transcription Server")
     parser.add_argument("--host", default=DEFAULT_HOST, help="Bind address (default: %(default)s)")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="TCP port (default: %(default)s)")
