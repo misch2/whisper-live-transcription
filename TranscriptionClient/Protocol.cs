@@ -9,7 +9,7 @@ namespace TranscriptionClient;
 /// Frame layout:  [type: 1 byte] [length: 4 bytes big-endian] [payload: N bytes]
 ///
 /// MSG_AUDIO payload layout:
-///   [client_send_time_ms: 8 bytes big-endian int64] [raw PCM int16 bytes…]
+///   [client_send_time_ms: 8 bytes big-endian int64] [raw PCM int16 bytesâ€¦]
 /// </summary>
 internal static class Protocol
 {

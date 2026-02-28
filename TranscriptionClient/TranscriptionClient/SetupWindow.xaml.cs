@@ -84,7 +84,7 @@ public partial class SetupWindow : Window
     {
         if (!int.TryParse(TxtPort.Text.Trim(), out int port) || port < 1 || port > 65535)
         {
-            MessageBox.Show("Please enter a valid port number (1–65535).",
+            MessageBox.Show("Please enter a valid port number (1â€“65535).",
                             "Invalid port", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
