@@ -27,10 +27,10 @@ public class AppSettings
     public bool AutoScroll { get; set; } = true;
 
     // ── Main window geometry ──────────────────────────────────────────────────
-    public double WindowLeft { get; set; } = double.NaN;
-    public double WindowTop { get; set; } = double.NaN;
-    public double WindowWidth { get; set; } = double.NaN;
-    public double WindowHeight { get; set; } = double.NaN;
+    public double? WindowLeft { get; set; } = null;
+    public double? WindowTop { get; set; } = null;
+    public double? WindowWidth { get; set; } = null;
+    public double? WindowHeight { get; set; } = null;
     public string WindowState { get; set; } = nameof(System.Windows.WindowState.Normal);
 
     /// <summary>

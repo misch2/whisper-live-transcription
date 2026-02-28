@@ -34,17 +34,17 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (!double.IsNaN(_settings.WindowLeft) && !double.IsNaN(_settings.WindowTop))
+        if (_settings.WindowLeft.HasValue && _settings.WindowTop.HasValue)
         {
-            Left = _settings.WindowLeft;
-            Top = _settings.WindowTop;
+            Left = _settings.WindowLeft.Value;
+            Top  = _settings.WindowTop.Value;
         }
 
-        if (!double.IsNaN(_settings.WindowWidth) && _settings.WindowWidth >= MinWidth)
-            Width = _settings.WindowWidth;
+        if (_settings.WindowWidth.HasValue && _settings.WindowWidth.Value >= MinWidth)
+            Width = _settings.WindowWidth.Value;
 
-        if (!double.IsNaN(_settings.WindowHeight) && _settings.WindowHeight >= MinHeight)
-            Height = _settings.WindowHeight;
+        if (_settings.WindowHeight.HasValue && _settings.WindowHeight.Value >= MinHeight)
+            Height = _settings.WindowHeight.Value;
 
         if (Enum.TryParse<WindowState>(_settings.WindowState, out var state) &&
             state != System.Windows.WindowState.Minimized)
