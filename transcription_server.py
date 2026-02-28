@@ -41,8 +41,10 @@ from protocol import (
     MSG_AUDIO,
     MSG_CONFIG,
     MSG_TRANSCRIPTION,
+    MSG_STATS,
     recv_message,
     send_message,
+    unpack_audio_payload,
 )
 
 # ── Whisper settings ─────────────────────────────────────────────────────────
@@ -219,9 +221,16 @@ class TranscriptionServer:
                     except json.JSONDecodeError:
                         pass
                 elif msg_type == MSG_AUDIO and payload:
-                    audio_q.put(payload)
+                    server_recv_ms = int(time.time() * 1000)
+                    try:
+                        client_ts_ms, pcm_bytes = unpack_audio_payload(payload)
+                    except Exception:
+                        # Older client without timestamp prefix — treat whole payload as PCM
+                        client_ts_ms = server_recv_ms
+                        pcm_bytes = payload
+                    audio_q.put((pcm_bytes, client_ts_ms, server_recv_ms))
                     if wav:
-                        wav.add_audio_chunk(payload)
+                        wav.add_audio_chunk(pcm_bytes)
         except Exception as exc:
             if not stop.is_set():
                 print(f"\nReader error: {exc}")
@@ -233,20 +242,23 @@ class TranscriptionServer:
     def _processor_loop(self, sock, audio_q, stop, stats):
         """Consume audio chunks, transcribe, and send results back."""
         window: List[bytes] = []
+        chunks_skipped = 0
 
         while not stop.is_set():
             try:
-                chunk = audio_q.get(timeout=1.0)
+                item = audio_q.get(timeout=1.0)
             except queue.Empty:
                 continue
-            if chunk is None:
+            if item is None:
                 break
 
-            t0 = time.time()
+            chunk, client_ts_ms, server_recv_ms = item
+            queue_dequeue_ms = int(time.time() * 1000)
 
             # Sliding-window management
             if len(window) >= WINDOW_LENGTH_SEC:
                 window.clear()
+                chunks_skipped += 1
                 self._send_transcription(sock, "", is_final=True, stop=stop)
 
             window.append(chunk)
@@ -259,6 +271,7 @@ class TranscriptionServer:
 
             # Transcribe
             assert self.whisper is not None
+            t_transcribe_start = time.time()
             segments, _ = self.whisper.transcribe(
                 audio_array,
                 language=WHISPER_LANGUAGE,
@@ -267,22 +280,51 @@ class TranscriptionServer:
                 vad_parameters=dict(min_silence_duration_ms=1000),
             )
             text = " ".join(s.text for s in segments).ljust(MAX_SENTENCE_CHARACTERS)
+            t_transcribe_end = time.time()
 
-            elapsed = time.time() - t0
-            stats["transcription"].append(elapsed)
+            transcription_lag_ms = int((t_transcribe_end - t_transcribe_start) * 1000)
+            network_lag_ms = max(0, server_recv_ms - client_ts_ms)
+            queue_lag_ms = max(0, queue_dequeue_ms - server_recv_ms)
+            queue_depth = audio_q.qsize()
+
+            stats["transcription"].append(transcription_lag_ms / 1000.0)
 
             # Mirror on server console
             ts = time.strftime("%H:%M:%S")
             print(f"\r{ts} {text}", end="", flush=True)
 
             self._send_transcription(sock, text, is_final=False, stop=stop)
+            self._send_stats(
+                sock,
+                network_lag_ms=network_lag_ms,
+                queue_lag_ms=queue_lag_ms,
+                transcription_lag_ms=transcription_lag_ms,
+                queue_depth=queue_depth,
+                chunks_skipped=chunks_skipped,
+                stop=stop,
+            )
 
-    # ── Send helper ───────────────────────────────────────────────────────
+    # ── Send helpers ──────────────────────────────────────────────────────
     @staticmethod
     def _send_transcription(sock, text, *, is_final, stop):
         payload = json.dumps({"text": text, "is_final": is_final}).encode("utf-8")
         try:
             send_message(sock, MSG_TRANSCRIPTION, payload)
+        except OSError:
+            stop.set()
+
+    @staticmethod
+    def _send_stats(sock, *, network_lag_ms, queue_lag_ms, transcription_lag_ms,
+                    queue_depth, chunks_skipped, stop):
+        payload = json.dumps({
+            "network_lag_ms": network_lag_ms,
+            "queue_lag_ms": queue_lag_ms,
+            "transcription_lag_ms": transcription_lag_ms,
+            "queue_depth": queue_depth,
+            "chunks_skipped": chunks_skipped,
+        }).encode("utf-8")
+        try:
+            send_message(sock, MSG_STATS, payload)
         except OSError:
             stop.set()
 

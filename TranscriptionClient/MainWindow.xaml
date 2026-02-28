@@ -64,6 +64,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>     <!-- transcript area -->
             <RowDefinition Height="Auto"/>  <!-- bottom bar: status + buttons -->
+            <RowDefinition Height="Auto"/>  <!-- stats bar -->
         </Grid.RowDefinitions>
 
         <!-- ══ Transcript area ═══════════════════════════════════════════════ -->
@@ -201,6 +202,45 @@
                            FontSize="12"
                            VerticalAlignment="Center"/>
             </DockPanel>
+        </Border>
+
+        <!-- ══ Stats bar ══════════════════════════════════════════════════════ -->
+        <Border Grid.Row="2"
+                x:Name="StatsBar"
+                Background="{StaticResource SurfaceBrush}"
+                CornerRadius="4" Padding="10,4" Margin="0,4,0,0"
+                Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
+                           Text="NET " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtNetLag"
+                           Foreground="{StaticResource GreenBrush}" FontSize="11" FontWeight="SemiBold"
+                           Text="— ms" VerticalAlignment="Center" MinWidth="54"/>
+
+                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
+                           Text="  QUEUE " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtQueueLag"
+                           Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="SemiBold"
+                           Text="— ms" VerticalAlignment="Center" MinWidth="54"/>
+
+                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
+                           Text="  TRANSCR " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtTranscriptionLag"
+                           Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="SemiBold"
+                           Text="— ms" VerticalAlignment="Center" MinWidth="64"/>
+
+                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
+                           Text="  DEPTH " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtQueueDepth"
+                           Foreground="{StaticResource FgBrush}" FontSize="11" FontWeight="SemiBold"
+                           Text="—" VerticalAlignment="Center" MinWidth="20"/>
+
+                <TextBlock Foreground="{StaticResource FgDimBrush}" FontSize="11"
+                           Text="  SKIPPED " VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtChunksSkipped"
+                           Foreground="{StaticResource RedBrush}" FontSize="11" FontWeight="SemiBold"
+                           Text="—" VerticalAlignment="Center" MinWidth="20"/>
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

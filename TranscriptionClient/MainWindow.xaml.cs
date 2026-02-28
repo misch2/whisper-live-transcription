@@ -10,11 +10,15 @@ public partial class MainWindow : Window
     private AppSettings _settings = LoadSettingsOrDefault();
 
     // Colours (match XAML palette)
-    private static readonly SolidColorBrush GreenBrush = new(Color.FromRgb(0x50, 0xFA, 0x7B));
-    private static readonly SolidColorBrush RedBrush = new(Color.FromRgb(0xFF, 0x55, 0x55));
+    private static readonly SolidColorBrush GreenBrush  = new(Color.FromRgb(0x50, 0xFA, 0x7B));
+    private static readonly SolidColorBrush RedBrush    = new(Color.FromRgb(0xFF, 0x55, 0x55));
     private static readonly SolidColorBrush AccentBrush = new(Color.FromRgb(0xBD, 0x93, 0xF9));
-    private static readonly SolidColorBrush DimBrush = new(Color.FromRgb(0x62, 0x72, 0xA4));
-    private static readonly SolidColorBrush FgBrush = new(Color.FromRgb(0xF8, 0xF8, 0xF2));
+    private static readonly SolidColorBrush DimBrush    = new(Color.FromRgb(0x62, 0x72, 0xA4));
+    private static readonly SolidColorBrush FgBrush     = new(Color.FromRgb(0xF8, 0xF8, 0xF2));
+
+    // Thresholds for colour-coding network / queue lag
+    private const int LagWarnMs = 300;
+    private const int LagBadMs  = 800;
 
     // The last child of TranscriptPanel; always a live (interim) block
     private TextBlock _liveBlock = null!;
@@ -124,6 +128,7 @@ public partial class MainWindow : Window
 
         _service = new TranscriptionService();
         _service.TranscriptionReceived += OnTranscriptionReceived;
+        _service.StatsReceived += OnStatsReceived;
         _service.Stopped += OnServiceStopped;
 
         try
@@ -185,6 +190,33 @@ public partial class MainWindow : Window
                 TranscriptScroller.ScrollToBottom();
         }
     }
+
+    // ── Stats events ──────────────────────────────────────────────────────────
+
+    private void OnStatsReceived(LagStats stats)
+    {
+        StatsBar.Visibility = Visibility.Visible;
+
+        TxtNetLag.Text           = $"{stats.NetworkLagMs} ms";
+        TxtNetLag.Foreground     = LagBrush(stats.NetworkLagMs);
+
+        TxtQueueLag.Text         = $"{stats.QueueLagMs} ms";
+        TxtQueueLag.Foreground   = LagBrush(stats.QueueLagMs);
+
+        TxtTranscriptionLag.Text      = $"{stats.TranscriptionLagMs} ms";
+        TxtTranscriptionLag.Foreground = LagBrush(stats.TranscriptionLagMs);
+
+        TxtQueueDepth.Text       = stats.QueueDepth.ToString();
+        TxtQueueDepth.Foreground = stats.QueueDepth > 2 ? RedBrush : FgBrush;
+
+        TxtChunksSkipped.Text       = stats.ChunksSkipped.ToString();
+        TxtChunksSkipped.Foreground = stats.ChunksSkipped > 0 ? RedBrush : FgBrush;
+    }
+
+    private SolidColorBrush LagBrush(int ms) =>
+        ms >= LagBadMs  ? RedBrush    :
+        ms >= LagWarnMs ? AccentBrush :
+                          GreenBrush;
 
     // ── Live block helpers ────────────────────────────────────────────────────
 
@@ -257,6 +289,7 @@ public partial class MainWindow : Window
         BtnDisconnect.IsEnabled = false;
         BtnSetup.IsEnabled = true;
         SetStatus("Disconnected", DimBrush);
+        StatsBar.Visibility = Visibility.Collapsed;
     }
 
     private void SetStatus(string text, SolidColorBrush dotColor)

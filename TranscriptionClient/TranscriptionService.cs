@@ -19,10 +19,13 @@ internal sealed class TranscriptionService : IDisposable
     private const int StepInSec = 1;          // seconds of audio per network message
     private const int ChunkBytes = SampleRate * Channels * (BitsPerSample / 8) * StepInSec;
 
-    // ?? Events ?????????????????????????????????????????????????????????????????
+    // ?? Events ????????????????????????????????????????????????????????????????
 
     /// <summary>Raised on the calling (UI) thread context with each live/final transcription.</summary>
     public event Action<string, bool>? TranscriptionReceived; // (text, isFinal)
+
+    /// <summary>Raised on the calling (UI) thread context with each stats update from the server.</summary>
+    public event Action<LagStats>? StatsReceived;
 
     /// <summary>Raised when the service stops, carrying an optional reason string.</summary>
     public event Action<string?>? Stopped;
@@ -142,7 +145,7 @@ internal sealed class TranscriptionService : IDisposable
                 }
 
                 if (chunk is not null && _stream is not null)
-                    await Protocol.SendMessageAsync(_stream, Protocol.MsgAudio, chunk, ct);
+                    await Protocol.SendMessageAsync(_stream, Protocol.MsgAudio, Protocol.PackAudioPayload(chunk), ct);
             }
         }
         catch (OperationCanceledException) { }
@@ -180,6 +183,21 @@ internal sealed class TranscriptionService : IDisposable
                     }
                     catch (JsonException) { /* ignore malformed messages */ }
                 }
+                else if (msgType == Protocol.MsgStats && payload.Length > 0)
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(payload);
+                        var stats = new LagStats(
+                            NetworkLagMs:       doc.RootElement.GetProperty("network_lag_ms").GetInt32(),
+                            QueueLagMs:         doc.RootElement.GetProperty("queue_lag_ms").GetInt32(),
+                            TranscriptionLagMs: doc.RootElement.GetProperty("transcription_lag_ms").GetInt32(),
+                            QueueDepth:         doc.RootElement.GetProperty("queue_depth").GetInt32(),
+                            ChunksSkipped:      doc.RootElement.GetProperty("chunks_skipped").GetInt32());
+                        RaiseStats(stats);
+                    }
+                    catch (JsonException) { /* ignore malformed messages */ }
+                }
             }
         }
         catch (OperationCanceledException) { }
@@ -194,6 +212,9 @@ internal sealed class TranscriptionService : IDisposable
 
     private void RaiseTranscription(string text, bool isFinal) =>
         _syncCtx.Post(_ => TranscriptionReceived?.Invoke(text, isFinal), null);
+
+    private void RaiseStats(LagStats stats) =>
+        _syncCtx.Post(_ => StatsReceived?.Invoke(stats), null);
 
     private void RaiseStopped(string? reason) =>
         _syncCtx.Post(_ => Stopped?.Invoke(reason), null);
