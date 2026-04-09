@@ -20,9 +20,12 @@ import threading
 import time
 from typing import Optional
 
+import colorama
 import numpy as np
 import pyaudio
 from termcolor import colored
+
+colorama.init()
 
 from protocol import (
     DEFAULT_PORT,

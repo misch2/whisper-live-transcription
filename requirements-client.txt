@@ -1,3 +1,4 @@
 pyaudio
 numpy
 termcolor
+colorama
