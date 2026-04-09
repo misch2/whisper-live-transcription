@@ -389,7 +389,7 @@ class TranscriptionServer:
             # Build numpy array from window
             audio_bytes = b"".join(window)
             audio_array = (
-                np.frombuffer(audio_bytes, np.int16).astype(np.float32) / 255.0
+                np.frombuffer(audio_bytes, np.int16).astype(np.float32) / 32768.0
             )
 
             # Transcribe
