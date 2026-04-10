@@ -31,6 +31,7 @@ from protocol import (
     DEFAULT_PORT,
     MSG_AUDIO,
     MSG_CONFIG,
+    MSG_ERROR,
     MSG_TRANSCRIPTION,
     recv_message,
     send_message,
@@ -50,10 +51,13 @@ DEFAULT_DEVICE_PREFIX = "Voicemeeter Out B1"
 class TranscriptionClient:
     """Captures audio, sends it to the server, and prints transcriptions."""
 
-    def __init__(self, host: str, port: int, device_prefix: Optional[str] = None):
+    def __init__(self, host: str, port: int, device_prefix: Optional[str] = None,
+                 model: Optional[str] = None, language: Optional[str] = None):
         self.host = host
         self.port = port
         self.device_prefix = device_prefix or DEFAULT_DEVICE_PREFIX
+        self.model = model or "turbo"
+        self.language = language or "en"
 
         self.sock: Optional[socket.socket] = None
         self.running = False
@@ -69,6 +73,8 @@ class TranscriptionClient:
             "sample_rate": RATE,
             "channels": NB_CHANNELS,
             "step_in_sec": STEP_IN_SEC,
+            "model": self.model,
+            "language": self.language,
         }
         send_message(self.sock, MSG_CONFIG, json.dumps(config).encode("utf-8"))
 
@@ -156,6 +162,16 @@ class TranscriptionClient:
                 self.running = False
                 return
 
+            if msg_type == MSG_ERROR and payload:
+                try:
+                    data = json.loads(payload.decode("utf-8"))
+                    error = data.get("error", "Unknown error")
+                    print(f"\n{colored('Server error:', 'red')} {error}")
+                except json.JSONDecodeError:
+                    print(f"\n{colored('Server error:', 'red')} (malformed)")
+                self.running = False
+                return
+
             if msg_type == MSG_TRANSCRIPTION and payload:
                 try:
                     data = json.loads(payload.decode("utf-8"))
@@ -227,6 +243,18 @@ def main():
         help="Audio input device name prefix (default: %(default)s)",
     )
     parser.add_argument(
+        "--model",
+        type=str,
+        default="turbo",
+        help="Whisper model name (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="en",
+        help="Transcription language code, e.g. en, cs, de (default: %(default)s)",
+    )
+    parser.add_argument(
         "--list-devices",
         action="store_true",
         help="List available audio input devices and exit",
@@ -237,7 +265,10 @@ def main():
         list_devices()
         return
 
-    client = TranscriptionClient(host=args.host, port=args.port, device_prefix=args.device)
+    client = TranscriptionClient(
+        host=args.host, port=args.port, device_prefix=args.device,
+        model=args.model, language=args.language,
+    )
     try:
         client.start()
     except KeyboardInterrupt:

@@ -48,6 +48,7 @@ from protocol import (
     DEFAULT_PORT,
     MSG_AUDIO,
     MSG_CONFIG,
+    MSG_ERROR,
     MSG_TRANSCRIPTION,
     MSG_STATS,
     recv_message,
@@ -56,9 +57,9 @@ from protocol import (
 )
 
 # ── Whisper settings ─────────────────────────────────────────────────────────
-WHISPER_LANGUAGE = "en"
+DEFAULT_WHISPER_LANGUAGE = "en"
+DEFAULT_WHISPER_MODEL = "turbo"
 WHISPER_THREADS = 4
-WHISPER_MODEL = "turbo"
 WHISPER_COMPUTE_TYPE = "float16"
 
 # ── Transcription window ─────────────────────────────────────────────────────
@@ -166,13 +167,14 @@ class TranscriptionServer:
 
         self.running = False
         self.whisper: Optional[WhisperModel] = None
+        self._loaded_model_name: Optional[str] = None
         self._server_socket: Optional[socket.socket] = None
         self._client_socket: Optional[socket.socket] = None
         self._unload_timer: Optional[threading.Timer] = None
         self._model_lock = threading.Lock()
 
     # ── Model loading ─────────────────────────────────────────────────────
-    def _load_model(self):
+    def _load_model(self, model_name: str):
         try:
             import ctranslate2
             cuda_devices = ctranslate2.get_cuda_device_count()
@@ -191,24 +193,29 @@ class TranscriptionServer:
         home_dir = os.path.expanduser("~")
         models_dir = os.path.join(home_dir, ".cache", "huggingface", "hub")
         print(
-            f"Loading Whisper model '{WHISPER_MODEL}' "
+            f"Loading Whisper model '{model_name}' "
             f"(device={device}, compute={compute_type}, threads={WHISPER_THREADS})..."
         )
         print(f"Model cache: {models_dir}")
         self.whisper = WhisperModel(
-            WHISPER_MODEL,
+            model_name,
             device=device,
             compute_type=compute_type,
             cpu_threads=WHISPER_THREADS,
             download_root=models_dir,
         )
+        self._loaded_model_name = model_name
         print("Whisper model ready.\n")
 
-    def _ensure_model_loaded(self):
-        """Load the model if it isn't already in memory (thread-safe)."""
+    def _ensure_model_loaded(self, model_name: str = DEFAULT_WHISPER_MODEL):
+        """Load or reload the model if needed (thread-safe)."""
         with self._model_lock:
-            if self.whisper is None:
-                self._load_model()
+            if self.whisper is None or self._loaded_model_name != model_name:
+                if self.whisper is not None:
+                    print(f"Model change requested: '{self._loaded_model_name}' -> '{model_name}'")
+                    self.whisper = None
+                    gc.collect()
+                self._load_model(model_name)
 
     def _unload_model(self):
         """Release the model and free memory."""
@@ -216,6 +223,7 @@ class TranscriptionServer:
             if self.whisper is not None:
                 print("No client connected for 60 s — unloading Whisper model.")
                 self.whisper = None
+                self._loaded_model_name = None
                 gc.collect()
 
     def _cancel_unload_timer(self):
@@ -252,7 +260,6 @@ class TranscriptionServer:
                 break
 
             self._cancel_unload_timer()
-            self._ensure_model_loaded()
 
             self._client_socket = client_sock
             print(f"\n{'=' * 60}")
@@ -263,6 +270,7 @@ class TranscriptionServer:
                 self._handle_client(client_sock)
             except Exception as exc:
                 print(f"\nError while handling client: {exc}")
+                self._send_error(client_sock, str(exc))
             finally:
                 self._client_socket = None
 
@@ -292,6 +300,11 @@ class TranscriptionServer:
         audio_q: queue.Queue = queue.Queue()
         stop = threading.Event()
         stats: Dict[str, List[float]] = {"transcription": []}
+        # Client-requested settings (populated from CONFIG message)
+        session: Dict[str, str] = {
+            "model": DEFAULT_WHISPER_MODEL,
+            "language": DEFAULT_WHISPER_LANGUAGE,
+        }
 
         # Optional WAV recorder
         wav = self._open_wav_recorder()
@@ -299,13 +312,23 @@ class TranscriptionServer:
         # Reader thread: socket ──► audio_q
         reader = threading.Thread(
             target=self._reader_thread,
-            args=(sock, audio_q, wav, stop),
+            args=(sock, audio_q, wav, stop, session),
             daemon=True,
         )
         reader.start()
 
+        # Wait for the reader to parse the CONFIG message before loading the model
+        # (give it a short window — the CONFIG is the first message the client sends)
+        for _ in range(50):  # up to 500 ms
+            if session.get("_config_received") or stop.is_set():
+                break
+            time.sleep(0.01)
+
+        self._ensure_model_loaded(session["model"])
+        print(f"Session language: {session['language']}, model: {session['model']}")
+
         # Process audio (runs in this thread)
-        self._processor_loop(sock, audio_q, stop, stats)
+        self._processor_loop(sock, audio_q, stop, stats, session)
 
         # ── Cleanup ───────────────────────────────────────────────────────
         stop.set()
@@ -330,7 +353,7 @@ class TranscriptionServer:
             pass
 
     # ── Reader thread ─────────────────────────────────────────────────────
-    def _reader_thread(self, sock, audio_q, wav, stop):
+    def _reader_thread(self, sock, audio_q, wav, stop, session):
         """Blocking read loop — runs in its own thread."""
         try:
             while not stop.is_set():
@@ -341,6 +364,11 @@ class TranscriptionServer:
                     try:
                         cfg = json.loads(payload.decode("utf-8"))
                         print(f"Client config: {cfg}")
+                        if "model" in cfg:
+                            session["model"] = cfg["model"]
+                        if "language" in cfg:
+                            session["language"] = cfg["language"]
+                        session["_config_received"] = True
                     except json.JSONDecodeError:
                         pass
                 elif msg_type == MSG_AUDIO and payload:
@@ -362,7 +390,7 @@ class TranscriptionServer:
             audio_q.put(None)  # sentinel to unblock processor
 
     # ── Processor loop ────────────────────────────────────────────────────
-    def _processor_loop(self, sock, audio_q, stop, stats):
+    def _processor_loop(self, sock, audio_q, stop, stats, session):
         """Consume audio chunks, transcribe, and send results back."""
         window: List[bytes] = []
         chunks_skipped = 0
@@ -397,7 +425,7 @@ class TranscriptionServer:
             t_transcribe_start = time.time()
             segments, _ = self.whisper.transcribe(
                 audio_array,
-                language=WHISPER_LANGUAGE,
+                language=session["language"],
                 beam_size=5,
                 vad_filter=True,
                 vad_parameters=dict(min_silence_duration_ms=1000),
@@ -431,6 +459,14 @@ class TranscriptionServer:
             send_message(sock, MSG_TRANSCRIPTION, payload)
         except OSError:
             stop.set()
+
+    @staticmethod
+    def _send_error(sock, message):
+        payload = json.dumps({"error": message}).encode("utf-8")
+        try:
+            send_message(sock, MSG_ERROR, payload)
+        except OSError:
+            pass
 
     @staticmethod
     def _send_stats(sock, *, network_lag_ms, queue_lag_ms, transcription_lag_ms,

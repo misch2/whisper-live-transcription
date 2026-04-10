@@ -53,7 +53,8 @@ internal sealed class TranscriptionService : IDisposable
     /// Connect to the server, configure the session and start capturing audio.
     /// Returns immediately; all I/O runs on background threads / tasks.
     /// </summary>
-    public async Task StartAsync(string host, int port, int deviceNumber)
+    public async Task StartAsync(string host, int port, int deviceNumber,
+                                  string model = "turbo", string language = "en")
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_tcpClient is not null)
@@ -73,6 +74,8 @@ internal sealed class TranscriptionService : IDisposable
             sample_rate = SampleRate,
             channels = Channels,
             step_in_sec = StepInSec,
+            model,
+            language,
         };
         var configJson = JsonSerializer.SerializeToUtf8Bytes(config);
         await Protocol.SendMessageAsync(_stream, Protocol.MsgConfig, configJson, ct);
@@ -169,6 +172,23 @@ internal sealed class TranscriptionService : IDisposable
                 {
                     if (!ct.IsCancellationRequested)
                         RaiseStopped("Server disconnected.");
+                    return;
+                }
+
+                if (msgType == Protocol.MsgError && payload.Length > 0)
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(payload);
+                        var error = doc.RootElement.TryGetProperty("error", out var e)
+                            ? e.GetString() ?? "Unknown error"
+                            : "Unknown error";
+                        RaiseStopped($"Server error: {error}");
+                    }
+                    catch (JsonException)
+                    {
+                        RaiseStopped("Server error (malformed message).");
+                    }
                     return;
                 }
 

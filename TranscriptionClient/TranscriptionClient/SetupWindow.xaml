@@ -5,8 +5,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
         Title="Setup – Whisper Live Transcription"
-        Height="400" Width="480"
-        MinHeight="400"
+        Height="470" Width="480"
+        MinHeight="470"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         FontFamily="Segoe UI" FontSize="13"
@@ -21,6 +21,8 @@
             <RowDefinition Height="Auto"/>  <!-- device filter -->
             <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>  <!-- device picker -->
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>  <!-- model + language -->
             <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>  <!-- auto-scroll -->
             <RowDefinition Height="12"/>
@@ -86,15 +88,40 @@
                        DisplayMemberPath="Name"/>
         </Grid>
 
+        <!-- Model + Language row -->
+        <Grid Grid.Row="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="120"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Whisper model"
+                       Foreground="{DynamicResource FgDimBrush}"
+                       FontSize="11" Margin="0,0,0,3"/>
+            <TextBox   Grid.Row="1" Grid.Column="0" x:Name="TxtModel" Padding="5,4"
+                       ToolTip="Model name: tiny, base, small, medium, large-v3, turbo"/>
+
+            <TextBlock Grid.Row="0" Grid.Column="2" Text="Language"
+                       Foreground="{DynamicResource FgDimBrush}"
+                       FontSize="11" Margin="0,0,0,3"/>
+            <TextBox   Grid.Row="1" Grid.Column="2" x:Name="TxtLanguage" Padding="5,4"
+                       ToolTip="Language code: en, cs, de, fr, etc."/>
+        </Grid>
+
         <!-- Auto-scroll -->
-        <CheckBox Grid.Row="8"
+        <CheckBox Grid.Row="10"
                   x:Name="ChkAutoScroll"
                   Content="Auto-scroll transcript"
                   Foreground="{DynamicResource FgBrush}"
                   FontSize="12"/>
 
         <!-- Theme selector -->
-        <StackPanel Grid.Row="10" Orientation="Horizontal">
+        <StackPanel Grid.Row="12" Orientation="Horizontal">
             <TextBlock Text="Theme:"
                        Foreground="{DynamicResource FgDimBrush}"
                        FontSize="12"
@@ -123,7 +150,7 @@
         </StackPanel>
 
         <!-- OK / Cancel -->
-        <StackPanel Grid.Row="12" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="14" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="BtnOk"
                     Content="OK"
                     Padding="18,6"

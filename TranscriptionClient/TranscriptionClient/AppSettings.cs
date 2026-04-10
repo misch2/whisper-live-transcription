@@ -24,6 +24,8 @@ public class AppSettings
     public string DeviceFilter { get; set; } = "Voicemeeter Out B1";
     public int DeviceNumber { get; set; } = 0;
     public string DeviceName { get; set; } = "(System default)";
+    public string Model { get; set; } = "turbo";
+    public string Language { get; set; } = "en";
     public bool AutoScroll { get; set; } = true;
     public AppThemeMode Theme { get; set; } = AppThemeMode.System;
 

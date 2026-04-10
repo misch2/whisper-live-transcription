@@ -19,6 +19,7 @@ internal static class Protocol
     public const byte MsgAudio         = 2;
     public const byte MsgTranscription = 3;
     public const byte MsgStats         = 4;
+    public const byte MsgError         = 5;
 
     /// <summary>Size of the timestamp prefix prepended to every audio payload.</summary>
     public const int AudioTimestampSize = 8;

@@ -12,6 +12,7 @@ Message types
                                           followed by raw PCM int16 audio data
   MSG_TRANSCRIPTION (3) Server → Client   JSON with transcription text
   MSG_STATS (4)         Server → Client   JSON with lag statistics
+  MSG_ERROR (5)         Server → Client   JSON with error message
 """
 
 import socket
@@ -23,6 +24,7 @@ MSG_CONFIG = 1
 MSG_AUDIO = 2
 MSG_TRANSCRIPTION = 3
 MSG_STATS = 4
+MSG_ERROR = 5
 
 # ── Network defaults ─────────────────────────────────────────────────────────
 DEFAULT_HOST = "0.0.0.0"

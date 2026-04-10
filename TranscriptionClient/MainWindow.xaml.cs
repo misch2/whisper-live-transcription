@@ -140,7 +140,8 @@ public partial class MainWindow : Window
 
         try
         {
-            await _service.StartAsync(_settings.Host, _settings.Port, deviceNumber);
+            await _service.StartAsync(_settings.Host, _settings.Port, deviceNumber,
+                                     _settings.Model, _settings.Language);
             SetConnected(_settings.Host, _settings.Port, _settings.DeviceName);
         }
         catch (Exception ex)

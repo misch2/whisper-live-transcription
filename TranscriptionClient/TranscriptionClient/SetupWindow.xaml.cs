@@ -22,6 +22,8 @@ public partial class SetupWindow : Window
             DeviceFilter = current.DeviceFilter,
             DeviceNumber = current.DeviceNumber,
             DeviceName = current.DeviceName,
+            Model = current.Model,
+            Language = current.Language,
             AutoScroll = current.AutoScroll,
             Theme = current.Theme,
         };
@@ -29,6 +31,8 @@ public partial class SetupWindow : Window
         TxtHost.Text = Settings.Host;
         TxtPort.Text = Settings.Port.ToString();
         TxtDeviceFilter.Text = Settings.DeviceFilter;
+        TxtModel.Text = Settings.Model;
+        TxtLanguage.Text = Settings.Language;
         ChkAutoScroll.IsChecked = Settings.AutoScroll;
 
         RbThemeSystem.IsChecked = Settings.Theme == AppThemeMode.System;
@@ -104,6 +108,8 @@ public partial class SetupWindow : Window
         Settings.DeviceFilter = TxtDeviceFilter.Text.Trim();
         Settings.DeviceNumber = selected?.DeviceNumber ?? -1;
         Settings.DeviceName = selected?.Name ?? "(System default)";
+        Settings.Model = string.IsNullOrWhiteSpace(TxtModel.Text) ? "turbo" : TxtModel.Text.Trim();
+        Settings.Language = string.IsNullOrWhiteSpace(TxtLanguage.Text) ? "en" : TxtLanguage.Text.Trim();
         Settings.AutoScroll = ChkAutoScroll.IsChecked == true;
         Settings.Theme = RbThemeLight.IsChecked == true ? AppThemeMode.Light
                        : RbThemeDark.IsChecked  == true ? AppThemeMode.Dark
